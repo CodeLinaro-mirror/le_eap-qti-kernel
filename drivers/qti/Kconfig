@@ -1,0 +1,3 @@
+source "drivers/qti/mhi/Kconfig"
+source "drivers/qti/qrtr/Kconfig"
+source "drivers/qti/rmnet_data/Kconfig"

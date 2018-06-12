@@ -1,0 +1,363 @@
+From 90d23a1c361f530830c905b2121c027c96a09b7e Mon Sep 17 00:00:00 2001
+From: Gustavo Solaira <gustavos@codeaurora.org>
+Date: Fri, 1 Jun 2018 01:45:58 -0700
+Subject: [PATCH] Enable MHI, QRTR and RMNET_DATA on i.MX
+
+Fix build errors and integration for MDM9x50 + i.MX.
+---
+ drivers/qti/mhi/controllers/Makefile |  2 +-
+ drivers/qti/mhi/core/mhi_pm.c        |  3 +++
+ drivers/qti/mhi/devices/mhi_netdev.c | 24 +-----------------------
+ drivers/qti/mhi/devices/mhi_uci.c    | 25 -------------------------
+ drivers/qti/qrtr/Kconfig             | 11 +++++------
+ drivers/qti/qrtr/Makefile            |  6 +++---
+ drivers/qti/qrtr/qrtr.c              | 12 ++++++------
+ drivers/qti/qrtr/qrtr.h              | 19 +++++++++++++++++++
+ include/linux/mhi.h                  |  6 +++---
+ 9 files changed, 41 insertions(+), 67 deletions(-)
+
+diff --git a/drivers/qti/mhi/controllers/Makefile b/drivers/qti/mhi/controllers/Makefile
+index 9cb38a5..292f696 100644
+--- a/drivers/qti/mhi/controllers/Makefile
++++ b/drivers/qti/mhi/controllers/Makefile
+@@ -1 +1 @@
+-obj-$(CONFIG_MHI_QCOM) += mhi_qcom.o mhi_arch_qcom.o
++obj-$(CONFIG_MHI_QCOM) += mhi_qcom.o
+diff --git a/drivers/qti/mhi/core/mhi_pm.c b/drivers/qti/mhi/core/mhi_pm.c
+index c476a20..d2c8ee3 100644
+--- a/drivers/qti/mhi/core/mhi_pm.c
++++ b/drivers/qti/mhi/core/mhi_pm.c
+@@ -772,6 +772,9 @@ void mhi_pm_st_worker(struct work_struct *work)
+ 		case MHI_ST_TRANSITION_AMSS:
+ 			mhi_pm_amss_transition(mhi_cntrl);
+ 			break;
++		case MHI_ST_TRANSITION_READY:
++			mhi_ready_state_transition(mhi_cntrl);
++			break;
+ 		default:
+ 			break;
+ 		}
+diff --git a/drivers/qti/mhi/devices/mhi_netdev.c b/drivers/qti/mhi/devices/mhi_netdev.c
+index 8b4ba70..1279c14 100644
+--- a/drivers/qti/mhi/devices/mhi_netdev.c
++++ b/drivers/qti/mhi/devices/mhi_netdev.c
+@@ -18,7 +18,6 @@
+ #include <linux/if_arp.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/debugfs.h>
+-#include <linux/ipc_logging.h>
+ #include <linux/device.h>
+ #include <linux/errno.h>
+ #include <linux/of_device.h>
+@@ -27,12 +26,9 @@
+ 
+ #define MHI_NETDEV_DRIVER_NAME "mhi_netdev"
+ #define WATCHDOG_TIMEOUT (30 * HZ)
+-#define IPC_LOG_PAGES (100)
+ 
+ #ifdef CONFIG_MHI_DEBUG
+ 
+-#define IPC_LOG_LVL (MHI_MSG_LVL_VERBOSE)
+-
+ #define MHI_ASSERT(cond, msg) do { \
+ 	if (cond) \
+ 		panic(msg); \
+@@ -41,16 +37,10 @@
+ #define MSG_VERB(fmt, ...) do { \
+ 	if (mhi_netdev->msg_lvl <= MHI_MSG_LVL_VERBOSE) \
+ 		pr_err("[D][%s] " fmt, __func__, ##__VA_ARGS__);\
+-	if (mhi_netdev->ipc_log && (mhi_netdev->ipc_log_lvl <= \
+-				    MHI_MSG_LVL_VERBOSE)) \
+-		ipc_log_string(mhi_netdev->ipc_log, "[D][%s] " fmt, \
+-			       __func__, ##__VA_ARGS__); \
+ } while (0)
+ 
+ #else
+ 
+-#define IPC_LOG_LVL (MHI_MSG_LVL_ERROR)
+-
+ #define MHI_ASSERT(cond, msg) do { \
+ 	if (cond) { \
+ 		MSG_ERR(msg); \
+@@ -65,19 +55,11 @@
+ #define MSG_LOG(fmt, ...) do { \
+ 	if (mhi_netdev->msg_lvl <= MHI_MSG_LVL_INFO) \
+ 		pr_err("[I][%s] " fmt, __func__, ##__VA_ARGS__);\
+-	if (mhi_netdev->ipc_log && (mhi_netdev->ipc_log_lvl <= \
+-				    MHI_MSG_LVL_INFO)) \
+-		ipc_log_string(mhi_netdev->ipc_log, "[I][%s] " fmt, \
+-			       __func__, ##__VA_ARGS__); \
+ } while (0)
+ 
+ #define MSG_ERR(fmt, ...) do { \
+ 	if (mhi_netdev->msg_lvl <= MHI_MSG_LVL_ERROR) \
+ 		pr_err("[E][%s] " fmt, __func__, ##__VA_ARGS__); \
+-	if (mhi_netdev->ipc_log && (mhi_netdev->ipc_log_lvl <= \
+-				    MHI_MSG_LVL_ERROR)) \
+-		ipc_log_string(mhi_netdev->ipc_log, "[E][%s] " fmt, \
+-			       __func__, ##__VA_ARGS__); \
+ } while (0)
+ 
+ struct mhi_stats {
+@@ -118,8 +100,6 @@ struct mhi_netdev {
+ 	struct mhi_stats stats;
+ 	struct dentry *dentry;
+ 	enum MHI_DEBUG_LEVEL msg_lvl;
+-	enum MHI_DEBUG_LEVEL ipc_log_lvl;
+-	void *ipc_log;
+ };
+ 
+ struct mhi_netdev_priv {
+@@ -959,10 +939,7 @@ static int mhi_netdev_probe(struct mhi_device *mhi_dev,
+ 	snprintf(node_name, sizeof(node_name), "%s_%04x_%02u.%02u.%02u_%u",
+ 		 mhi_netdev->interface_name, mhi_dev->dev_id, mhi_dev->domain,
+ 		 mhi_dev->bus, mhi_dev->slot, mhi_netdev->alias);
+-	mhi_netdev->ipc_log = ipc_log_context_create(IPC_LOG_PAGES, node_name,
+-						     0);
+ 	mhi_netdev->msg_lvl = MHI_MSG_LVL_ERROR;
+-	mhi_netdev->ipc_log_lvl = IPC_LOG_LVL;
+ 
+ 	/* setup network interface */
+ 	ret = mhi_netdev_enable_iface(mhi_netdev);
+@@ -977,6 +954,7 @@ static int mhi_netdev_probe(struct mhi_device *mhi_dev,
+ static const struct mhi_device_id mhi_netdev_match_table[] = {
+ 	{ .chan = "IP_HW0" },
+ 	{ .chan = "IP_HW_ADPL" },
++	{ .chan = "IP_SW0" },
+ 	{ NULL },
+ };
+ 
+diff --git a/drivers/qti/mhi/devices/mhi_uci.c b/drivers/qti/mhi/devices/mhi_uci.c
+index c8a3fdb..afb782b 100644
+--- a/drivers/qti/mhi/devices/mhi_uci.c
++++ b/drivers/qti/mhi/devices/mhi_uci.c
+@@ -15,7 +15,6 @@
+ #include <linux/dma-direction.h>
+ #include <linux/errno.h>
+ #include <linux/fs.h>
+-#include <linux/ipc_logging.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/of_device.h>
+@@ -55,7 +54,6 @@ struct uci_dev {
+ 	size_t mtu;
+ 	int ref_count;
+ 	bool enabled;
+-	void *ipc_log;
+ };
+ 
+ struct mhi_uci_drv {
+@@ -70,24 +68,9 @@ enum MHI_DEBUG_LEVEL msg_lvl = MHI_MSG_LVL_ERROR;
+ 
+ #ifdef CONFIG_MHI_DEBUG
+ 
+-#define IPC_LOG_LVL (MHI_MSG_LVL_VERBOSE)
+-#define MHI_UCI_IPC_LOG_PAGES (25)
+-
+-#else
+-
+-#define IPC_LOG_LVL (MHI_MSG_LVL_ERROR)
+-#define MHI_UCI_IPC_LOG_PAGES (1)
+-
+-#endif
+-
+-#ifdef CONFIG_MHI_DEBUG
+-
+ #define MSG_VERB(fmt, ...) do { \
+ 		if (msg_lvl <= MHI_MSG_LVL_VERBOSE) \
+ 			pr_err("[D][%s] " fmt, __func__, ##__VA_ARGS__); \
+-		if (uci_dev->ipc_log && (IPC_LOG_LVL <= MHI_MSG_LVL_VERBOSE)) \
+-			ipc_log_string(uci_dev->ipc_log, "[D][%s] " fmt, \
+-				       __func__, ##__VA_ARGS__); \
+ 	} while (0)
+ 
+ #else
+@@ -99,17 +82,11 @@ enum MHI_DEBUG_LEVEL msg_lvl = MHI_MSG_LVL_ERROR;
+ #define MSG_LOG(fmt, ...) do { \
+ 		if (msg_lvl <= MHI_MSG_LVL_INFO) \
+ 			pr_err("[I][%s] " fmt, __func__, ##__VA_ARGS__); \
+-		if (uci_dev->ipc_log && (IPC_LOG_LVL <= MHI_MSG_LVL_INFO)) \
+-			ipc_log_string(uci_dev->ipc_log, "[I][%s] " fmt, \
+-				       __func__, ##__VA_ARGS__); \
+ 	} while (0)
+ 
+ #define MSG_ERR(fmt, ...) do { \
+ 		if (msg_lvl <= MHI_MSG_LVL_ERROR) \
+ 			pr_err("[E][%s] " fmt, __func__, ##__VA_ARGS__); \
+-		if (uci_dev->ipc_log && (IPC_LOG_LVL <= MHI_MSG_LVL_ERROR)) \
+-			ipc_log_string(uci_dev->ipc_log, "[E][%s] " fmt, \
+-				       __func__, ##__VA_ARGS__); \
+ 	} while (0)
+ 
+ #define MAX_UCI_DEVICES (64)
+@@ -575,8 +552,6 @@ static int mhi_uci_probe(struct mhi_device *mhi_dev,
+ 	snprintf(node_name, sizeof(node_name), "mhi_uci_%04x_%02u.%02u.%02u_%d",
+ 		 mhi_dev->dev_id, mhi_dev->domain, mhi_dev->bus, mhi_dev->slot,
+ 		 mhi_dev->ul_chan_id);
+-	uci_dev->ipc_log = ipc_log_context_create(MHI_UCI_IPC_LOG_PAGES,
+-						  node_name, 0);
+ 
+ 	for (dir = 0; dir < 2; dir++) {
+ 		struct uci_chan *uci_chan = (dir) ?
+diff --git a/drivers/qti/qrtr/Kconfig b/drivers/qti/qrtr/Kconfig
+index 61d66dd..f4b232c 100644
+--- a/drivers/qti/qrtr/Kconfig
++++ b/drivers/qti/qrtr/Kconfig
+@@ -1,9 +1,8 @@
+ # Qualcomm IPC Router configuration
+ #
+ 
+-config QRTR
++config QRTR_QTI
+ 	tristate "Qualcomm IPC Router support"
+-	depends on ARCH_QCOM || COMPILE_TEST
+ 	---help---
+ 	  Say Y if you intend to use Qualcomm IPC router protocol.  The
+ 	  protocol is used to communicate with services provided by other
+@@ -12,20 +11,20 @@ config QRTR
+ 	  In order to do service lookups, a userspace daemon is required to
+ 	  maintain a service listing.
+ 
+-if QRTR
++if QRTR_QTI
+ 
+-config QRTR_SMD
++config QRTR_QTI_SMD
+ 	tristate "SMD IPC Router channels"
+ 	depends on RPMSG || (COMPILE_TEST && RPMSG=n)
+ 	---help---
+ 	  Say Y here to support SMD based ipcrouter channels.  SMD is the
+ 	  most common transport for IPC Router.
+ 
+-config QRTR_MHI
++config QRTR_QTI_MHI
+ 	tristate "MHI IPC Router channels"
+ 	depends on MHI_BUS || (COMPILE_TEST && MHI_BUS=n)
+ 	---help---
+ 	  Say Y here to support MHI based ipcrouter channels.  MHI is the
+ 	  transport used for external modem connections for IPC Router.
+ 
+-endif # QRTR
++endif # QRTR_QTI
+diff --git a/drivers/qti/qrtr/Makefile b/drivers/qti/qrtr/Makefile
+index c31cf13..798658e 100644
+--- a/drivers/qti/qrtr/Makefile
++++ b/drivers/qti/qrtr/Makefile
+@@ -1,7 +1,7 @@
+-obj-$(CONFIG_QRTR) := qrtr.o
++obj-$(CONFIG_QRTR_QTI) := qrtr.o
+ 
+-obj-$(CONFIG_QRTR_SMD) += qrtr-smd.o
++obj-$(CONFIG_QRTR_QTI_SMD) += qrtr-smd.o
+ qrtr-smd-y	:= smd.o
+ 
+-obj-$(CONFIG_QRTR_MHI) += qrtr-mhi.o
++obj-$(CONFIG_QRTR_QTI_MHI) += qrtr-mhi.o
+ qrtr-mhi-y	:= mhi.o
+diff --git a/drivers/qti/qrtr/qrtr.c b/drivers/qti/qrtr/qrtr.c
+index a66b217..f761b08 100644
+--- a/drivers/qti/qrtr/qrtr.c
++++ b/drivers/qti/qrtr/qrtr.c
+@@ -192,7 +192,7 @@ static int qrtr_node_enqueue(struct qrtr_node *node, struct sk_buff *skb,
+ 	size_t len = skb->len;
+ 	int rc = -ENODEV;
+ 
+-	hdr = skb_push(skb, sizeof(*hdr));
++	hdr = (struct qrtr_hdr_v1 *)skb_push(skb, sizeof(*hdr));
+ 	hdr->version = cpu_to_le32(QRTR_PROTO_VER_1);
+ 	hdr->type = cpu_to_le32(type);
+ 	hdr->src_node_id = cpu_to_le32(from->sq_node);
+@@ -306,9 +306,9 @@ int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len)
+ 		cb->dst_node = le16_to_cpu(v2->dst_node_id);
+ 		cb->dst_port = le16_to_cpu(v2->dst_port_id);
+ 
+-		if (cb->src_port == (u16)QRTR_PORT_CTRL)
++		if (cb->src_port == (u16)QRTR_PORT_CTRL || cb->src_port == 0x0000FFFF)
+ 			cb->src_port = QRTR_PORT_CTRL;
+-		if (cb->dst_port == (u16)QRTR_PORT_CTRL)
++		if (cb->dst_port == (u16)QRTR_PORT_CTRL || cb->dst_port == 0x0000FFFF)
+ 			cb->dst_port = QRTR_PORT_CTRL;
+ 
+ 		size = le32_to_cpu(v2->size);
+@@ -357,6 +357,7 @@ static struct sk_buff *qrtr_alloc_ctrl_packet(struct qrtr_ctrl_pkt **pkt)
+ 		return NULL;
+ 
+ 	skb_reserve(skb, QRTR_HDR_MAX_SIZE);
++
+ 	*pkt = skb_put_zero(skb, pkt_len);
+ 
+ 	return skb;
+@@ -1092,8 +1093,7 @@ static const struct nla_policy qrtr_policy[IFA_MAX + 1] = {
+ 	[IFA_LOCAL] = { .type = NLA_U32 },
+ };
+ 
+-static int qrtr_addr_doit(struct sk_buff *skb, struct nlmsghdr *nlh,
+-			  struct netlink_ext_ack *extack)
++static int qrtr_addr_doit(struct sk_buff *skb, struct nlmsghdr *nlh)
+ {
+ 	struct nlattr *tb[IFA_MAX + 1];
+ 	struct ifaddrmsg *ifm;
+@@ -1105,7 +1105,7 @@ static int qrtr_addr_doit(struct sk_buff *skb, struct nlmsghdr *nlh,
+ 
+ 	ASSERT_RTNL();
+ 
+-	rc = nlmsg_parse(nlh, sizeof(*ifm), tb, IFA_MAX, qrtr_policy, extack);
++	rc = nlmsg_parse(nlh, sizeof(*ifm), tb, IFA_MAX, qrtr_policy);
+ 	if (rc < 0)
+ 		return rc;
+ 
+diff --git a/drivers/qti/qrtr/qrtr.h b/drivers/qti/qrtr/qrtr.h
+index b81e695..ac007b0 100644
+--- a/drivers/qti/qrtr/qrtr.h
++++ b/drivers/qti/qrtr/qrtr.h
+@@ -29,4 +29,23 @@ void qrtr_endpoint_unregister(struct qrtr_endpoint *ep);
+ 
+ int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len);
+ 
++static inline void *skb_put_zero(struct sk_buff *skb, unsigned int len)
++{
++	void *tmp = skb_put(skb, len);
++
++	memset(tmp, 0, len);
++
++	return tmp;
++}
++
++static inline void *skb_put_data(struct sk_buff *skb, const void *data,
++				 unsigned int len)
++{
++	void *tmp = skb_put(skb, len);
++
++	memcpy(tmp, data, len);
++
++	return tmp;
++}
++
+ #endif
+diff --git a/include/linux/mhi.h b/include/linux/mhi.h
+index 71eaa9f..a703fb0 100644
+--- a/include/linux/mhi.h
++++ b/include/linux/mhi.h
+@@ -532,8 +532,8 @@ int mhi_force_rddm_mode(struct mhi_controller *mhi_cntrl);
+ #ifdef CONFIG_MHI_DEBUG
+ 
+ #define MHI_VERB(fmt, ...) do { \
+-		if (mhi_cntrl->klog_lvl <= MHI_MSG_VERBOSE) \
+-			pr_dbg("[D][%s] " fmt, __func__, ##__VA_ARGS__);\
++		if (mhi_cntrl->klog_lvl <= MHI_MSG_LVL_VERBOSE) \
++			pr_debug("[D][%s] " fmt, __func__, ##__VA_ARGS__);\
+ } while (0)
+ 
+ #else
+@@ -543,7 +543,7 @@ int mhi_force_rddm_mode(struct mhi_controller *mhi_cntrl);
+ #endif
+ 
+ #define MHI_LOG(fmt, ...) do {	\
+-		if (mhi_cntrl->klog_lvl <= MHI_MSG_INFO) \
++		if (mhi_cntrl->klog_lvl <= MHI_MSG_LVL_INFO) \
+ 			pr_info("[I][%s] " fmt, __func__, ##__VA_ARGS__);\
+ } while (0)
+ 
+-- 
+1.9.1
+

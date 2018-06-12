@@ -1,0 +1,43 @@
+From 371e6bb53c8f2aa64737cbc908e6942442f030d1 Mon Sep 17 00:00:00 2001
+From: Sujeev Dias <sdias@codeaurora.org>
+Date: Wed, 7 Feb 2018 14:04:35 -0800
+Subject: [PATCH] mhi_bus: core: Add support for MHI host interface
+
+MHI Host Interface is a communication protocol to be used by the host
+to control and communcate with modem over a high speed peripheral bus.
+This module will allow host to communicate with external devices that
+support MHI protocol.
+
+CRs-Fixed: 2204910
+Change-Id: I6057f9167ebbb5d4dc2ebb91e46ede6bc7054325
+Signed-off-by: Sujeev Dias <sdias@codeaurora.org>
+---
+ include/linux/mod_devicetable.h | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/include/linux/mod_devicetable.h b/include/linux/mod_devicetable.h
+index 545db52..76b4958 100644
+--- a/include/linux/mod_devicetable.h
++++ b/include/linux/mod_devicetable.h
+@@ -705,5 +705,18 @@ struct fsl_mc_device_id {
+ 	const char obj_type[16];
+ };
+ 
++/**
++ * struct mhi_device_id - MHI device identification
++ * @chan: MHI channel name
++ * @driver_data: driver data;
++ */
++
++struct mhi_device_id {
++	const char *chan;
++	kernel_ulong_t driver_data;
++};
++
++
++
+ 
+ #endif /* LINUX_MOD_DEVICETABLE_H */
+-- 
+1.9.1
+
