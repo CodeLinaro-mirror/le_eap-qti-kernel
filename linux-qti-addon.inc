@@ -29,11 +29,6 @@ FILESEXTRAPATHS_append := ":${COREBASE}/..:${COREBASE}/.."
 SRC_URI += "file://eap-qti-kernel"
 
 do_unpack_extra () {
-    if [ ! -e ${WORKDIR}/eap-qti-kernel/.install_done ]; then
-        cd ${WORKDIR}/eap-qti-kernel
-        /bin/bash install.sh
-        cd -
-    fi
     cp -r ${WORKDIR}/eap-qti-kernel/* ${S}/
     cp ${WORKDIR}/eap-qti-kernel/devicetree/* ${S}/arch/arm/boot/dts/
     echo "source \"drivers/qti/Kconfig"\" >> ${S}/drivers/Kconfig
@@ -44,10 +39,10 @@ do_unpack_extra () {
     echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6q-sabrelite.dts
     echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6sx-sdb.dts
     cd ${S}
-    git apply ${WORKDIR}/eap-qti-kernel/patches/rmnet-data-1.patch
-    git apply ${WORKDIR}/eap-qti-kernel/patches/rmnet-data-2.patch
-    git apply ${WORKDIR}/eap-qti-kernel/patches/0004-mhi_bus-core-Add-support-for-MHI-host-interface.patch
-    git apply ${WORKDIR}/eap-qti-kernel/patches/0005-net-Add-the-get-current-NAPI-context-API.patch
+    git apply ${WORKDIR}/eap-qti-kernel/patches/0001-mhi_bus-core-Add-support-for-MHI-host-interface.patch
+    git apply ${WORKDIR}/eap-qti-kernel/patches/0002-net-Add-the-get-current-NAPI-context-API.patch
+    git apply ${WORKDIR}/eap-qti-kernel/patches/0003-msm_rmnet-merge-support-for-RAWIP-msm_rmnet-device.patch
+    git apply ${WORKDIR}/eap-qti-kernel/patches/0004-net-rmnet_data-Add-snapshot-of-rmnet_data-driver.patch
     cd -
 }
 
