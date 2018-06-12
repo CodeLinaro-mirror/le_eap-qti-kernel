@@ -192,7 +192,7 @@ static int qrtr_node_enqueue(struct qrtr_node *node, struct sk_buff *skb,
 	size_t len = skb->len;
 	int rc = -ENODEV;
 
-	hdr = skb_push(skb, sizeof(*hdr));
+	hdr = (struct qrtr_hdr_v1 *)skb_push(skb, sizeof(*hdr));
 	hdr->version = cpu_to_le32(QRTR_PROTO_VER_1);
 	hdr->type = cpu_to_le32(type);
 	hdr->src_node_id = cpu_to_le32(from->sq_node);
@@ -306,9 +306,9 @@ int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len)
 		cb->dst_node = le16_to_cpu(v2->dst_node_id);
 		cb->dst_port = le16_to_cpu(v2->dst_port_id);
 
-		if (cb->src_port == (u16)QRTR_PORT_CTRL)
+		if (cb->src_port == (u16)QRTR_PORT_CTRL || cb->src_port == 0x0000FFFF)
 			cb->src_port = QRTR_PORT_CTRL;
-		if (cb->dst_port == (u16)QRTR_PORT_CTRL)
+		if (cb->dst_port == (u16)QRTR_PORT_CTRL || cb->dst_port == 0x0000FFFF)
 			cb->dst_port = QRTR_PORT_CTRL;
 
 		size = le32_to_cpu(v2->size);
@@ -357,6 +357,7 @@ static struct sk_buff *qrtr_alloc_ctrl_packet(struct qrtr_ctrl_pkt **pkt)
 		return NULL;
 
 	skb_reserve(skb, QRTR_HDR_MAX_SIZE);
+
 	*pkt = skb_put_zero(skb, pkt_len);
 
 	return skb;
@@ -1092,8 +1093,7 @@ static const struct nla_policy qrtr_policy[IFA_MAX + 1] = {
 	[IFA_LOCAL] = { .type = NLA_U32 },
 };
 
-static int qrtr_addr_doit(struct sk_buff *skb, struct nlmsghdr *nlh,
-			  struct netlink_ext_ack *extack)
+static int qrtr_addr_doit(struct sk_buff *skb, struct nlmsghdr *nlh)
 {
 	struct nlattr *tb[IFA_MAX + 1];
 	struct ifaddrmsg *ifm;
@@ -1105,7 +1105,7 @@ static int qrtr_addr_doit(struct sk_buff *skb, struct nlmsghdr *nlh,
 
 	ASSERT_RTNL();
 
-	rc = nlmsg_parse(nlh, sizeof(*ifm), tb, IFA_MAX, qrtr_policy, extack);
+	rc = nlmsg_parse(nlh, sizeof(*ifm), tb, IFA_MAX, qrtr_policy);
 	if (rc < 0)
 		return rc;
 

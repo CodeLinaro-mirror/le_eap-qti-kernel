@@ -532,8 +532,8 @@ int mhi_force_rddm_mode(struct mhi_controller *mhi_cntrl);
 #ifdef CONFIG_MHI_DEBUG
 
 #define MHI_VERB(fmt, ...) do { \
-		if (mhi_cntrl->klog_lvl <= MHI_MSG_VERBOSE) \
-			pr_dbg("[D][%s] " fmt, __func__, ##__VA_ARGS__);\
+		if (mhi_cntrl->klog_lvl <= MHI_MSG_LVL_VERBOSE) \
+			pr_debug("[D][%s] " fmt, __func__, ##__VA_ARGS__);\
 } while (0)
 
 #else
@@ -543,7 +543,7 @@ int mhi_force_rddm_mode(struct mhi_controller *mhi_cntrl);
 #endif
 
 #define MHI_LOG(fmt, ...) do {	\
-		if (mhi_cntrl->klog_lvl <= MHI_MSG_INFO) \
+		if (mhi_cntrl->klog_lvl <= MHI_MSG_LVL_INFO) \
 			pr_info("[I][%s] " fmt, __func__, ##__VA_ARGS__);\
 } while (0)
 
