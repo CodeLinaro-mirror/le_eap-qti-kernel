@@ -26,28 +26,35 @@
 # IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 FILESEXTRAPATHS_append := ":${COREBASE}/..:${COREBASE}/.."
-SRC_URI += "file://qti-kernel-drivers"
+SRC_URI += "file://eap-qti-kernel"
 
 do_unpack_extra () {
-    cp -r ${WORKDIR}/qti-kernel-drivers/* ${S}/
-    cp ${WORKDIR}/qti-kernel-drivers/devicetree/* ${S}/arch/arm/boot/dts/
+    if [ ! -e ${WORKDIR}/eap-qti-kernel/.install_done ]; then
+        cd ${WORKDIR}/eap-qti-kernel
+        /bin/bash install.sh
+        cd -
+    fi
+    cp -r ${WORKDIR}/eap-qti-kernel/* ${S}/
+    cp ${WORKDIR}/eap-qti-kernel/devicetree/* ${S}/arch/arm/boot/dts/
     echo "source \"drivers/qti/Kconfig"\" >> ${S}/drivers/Kconfig
     echo "obj-y += qti/" >> ${S}/drivers/Makefile
     echo "header-y += qrtr.h" >> ${S}/include/uapi/linux/Kbuild
+    echo "header-y += msm_rmnet.h" >> ${S}/include/uapi/linux/Kbuild
+    echo "header-y += rmnet_data.h" >> ${S}/include/uapi/linux/Kbuild
     echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6q-sabrelite.dts
     echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6sx-sdb.dts
     cd ${S}
-    git apply ${WORKDIR}/qti-kernel-drivers/patches/rmnet-data-1.patch
-    git apply ${WORKDIR}/qti-kernel-drivers/patches/rmnet-data-2.patch
-    git apply ${WORKDIR}/qti-kernel-drivers/patches/0004-mhi_bus-core-Add-support-for-MHI-host-interface.patch
-    git apply ${WORKDIR}/qti-kernel-drivers/patches/0005-net-Add-the-get-current-NAPI-context-API.patch
+    git apply ${WORKDIR}/eap-qti-kernel/patches/rmnet-data-1.patch
+    git apply ${WORKDIR}/eap-qti-kernel/patches/rmnet-data-2.patch
+    git apply ${WORKDIR}/eap-qti-kernel/patches/0004-mhi_bus-core-Add-support-for-MHI-host-interface.patch
+    git apply ${WORKDIR}/eap-qti-kernel/patches/0005-net-Add-the-get-current-NAPI-context-API.patch
     cd -
 }
 
 addtask unpack_extra after do_unpack before do_patch
 
 do_defconfig_patch () {
-    cat ${WORKDIR}/qti-kernel-drivers/defconfig >> ${WORKDIR}/defconfig
+    cat ${WORKDIR}/eap-qti-kernel/defconfig >> ${WORKDIR}/defconfig
 }
 
 do_patch_append () {
