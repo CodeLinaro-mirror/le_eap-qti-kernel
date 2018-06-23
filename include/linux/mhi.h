@@ -527,7 +527,7 @@ int mhi_download_rddm_img(struct mhi_controller *mhi_cntrl, bool in_panic);
  */
 int mhi_force_rddm_mode(struct mhi_controller *mhi_cntrl);
 
-#ifndef CONFIG_ARCH_QCOM
+#ifndef CONFIG_IPC_LOGGING
 
 #ifdef CONFIG_MHI_DEBUG
 

@@ -40,26 +40,13 @@ void mhi_deinit_pci_dev(struct mhi_controller *mhi_cntrl);
 int mhi_pci_probe(struct pci_dev *pci_dev,
 		  const struct pci_device_id *device_id);
 
-#ifdef CONFIG_ARCH_QCOM
-
-int mhi_arch_pcie_init(struct mhi_controller *mhi_cntrl);
-void mhi_arch_pcie_deinit(struct mhi_controller *mhi_cntrl);
-int mhi_arch_platform_init(struct mhi_dev *mhi_dev);
-void mhi_arch_platform_deinit(struct mhi_dev *mhi_dev);
-int mhi_arch_iommu_init(struct mhi_controller *mhi_cntrl);
-void mhi_arch_iommu_deinit(struct mhi_controller *mhi_cntrl);
-int mhi_arch_link_off(struct mhi_controller *mhi_cntrl, bool graceful);
-int mhi_arch_link_on(struct mhi_controller *mhi_cntrl);
-
-#else
-
 static inline int mhi_arch_iommu_init(struct mhi_controller *mhi_cntrl)
 {
 	struct mhi_dev *mhi_dev = mhi_controller_get_devdata(mhi_cntrl);
 
 	mhi_cntrl->dev = &mhi_dev->pci_dev->dev;
 
-	return dma_set_mask_and_coherent(mhi_cntrl->dev, DMA_BIT_MASK(64));
+	return dma_set_mask_and_coherent(mhi_cntrl->dev, DMA_BIT_MASK(32));
 }
 
 static inline void mhi_arch_iommu_deinit(struct mhi_controller *mhi_cntrl)
@@ -94,7 +81,5 @@ static inline int mhi_arch_link_on(struct mhi_controller *mhi_cntrl)
 {
 	return 0;
 }
-
-#endif
 
 #endif /* _MHI_QCOM_ */

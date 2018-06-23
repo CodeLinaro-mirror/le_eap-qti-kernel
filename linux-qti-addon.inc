@@ -31,14 +31,26 @@ SRC_URI += "file://eap-qti-kernel"
 
 do_unpack_extra () {
     cp -r ${WORKDIR}/eap-qti-kernel/* ${S}/
-    cp ${WORKDIR}/eap-qti-kernel/devicetree/* ${S}/arch/arm/boot/dts/
+    if [ -e ${S}/arch/arm/boot/dts ]; then
+        cp ${WORKDIR}/eap-qti-kernel/devicetree/* ${S}/arch/arm/boot/dts/
+    fi
+    if [ -e ${S}/arch/arm64/boot/dts/freescale ]; then
+        cp ${WORKDIR}/eap-qti-kernel/devicetree/* ${S}/arch/arm64/boot/dts/freescale/
+    fi
     echo "source \"drivers/qti/Kconfig"\" >> ${S}/drivers/Kconfig
     echo "obj-y += qti/" >> ${S}/drivers/Makefile
     echo "header-y += qrtr.h" >> ${S}/include/uapi/linux/Kbuild
     echo "header-y += msm_rmnet.h" >> ${S}/include/uapi/linux/Kbuild
     echo "header-y += rmnet_data.h" >> ${S}/include/uapi/linux/Kbuild
-    echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6q-sabrelite.dts
-    echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6sx-sdb.dts
+    if [ -e ${S}/arch/arm/boot/dts/imx6q-sabrelite.dts ]; then
+        echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6q-sabrelite.dts
+    fi
+    if [ -e ${S}/arch/arm/boot/dts/imx6sx-sdb.dts ]; then
+        echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6sx-sdb.dts
+    fi
+    if [ -e ${S}/arch/arm64/boot/dts/fsl-imx8qxp-mek.dts ]; then
+        echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm64/boot/dts/fsl-imx8qxp-mek.dts
+    fi
     cd ${S}
     git apply ${WORKDIR}/eap-qti-kernel/patches/0001-mhi_bus-core-Add-support-for-MHI-host-interface.patch
     git apply ${WORKDIR}/eap-qti-kernel/patches/0002-net-Add-the-get-current-NAPI-context-API.patch
