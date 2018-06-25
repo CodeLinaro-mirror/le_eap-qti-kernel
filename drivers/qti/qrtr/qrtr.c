@@ -27,6 +27,8 @@
 #define QRTR_MIN_EPH_SOCKET 0x4000
 #define QRTR_MAX_EPH_SOCKET 0x7fff
 
+#define QRTR_PORT_CTRL_LEGACY 0xffff
+
 /**
  * struct qrtr_hdr_v1 - (I|R)PCrouter packet header version 1
  * @version: protocol version
@@ -306,17 +308,16 @@ int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len)
 		cb->dst_node = le16_to_cpu(v2->dst_node_id);
 		cb->dst_port = le16_to_cpu(v2->dst_port_id);
 
-		if (cb->src_port == (u16)QRTR_PORT_CTRL || cb->src_port == 0x0000FFFF)
-			cb->src_port = QRTR_PORT_CTRL;
-		if (cb->dst_port == (u16)QRTR_PORT_CTRL || cb->dst_port == 0x0000FFFF)
-			cb->dst_port = QRTR_PORT_CTRL;
-
 		size = le32_to_cpu(v2->size);
 		break;
 	default:
 		pr_err("qrtr: Invalid version %d\n", ver);
 		goto err;
 	}
+
+	/* Control port has a different format in older IPCR targets */
+	if (cb->dst_port == QRTR_PORT_CTRL_LEGACY)
+		cb->dst_port = QRTR_PORT_CTRL;
 
 	if (len != ALIGN(size, 4) + hdrlen)
 		goto err;
