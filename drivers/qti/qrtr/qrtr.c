@@ -375,6 +375,7 @@ static void qrtr_node_rx_work(struct work_struct *work)
 {
 	struct qrtr_node *node = container_of(work, struct qrtr_node, work);
 	struct qrtr_ctrl_pkt *pkt;
+	struct qrtr_ctrl_pkt *msg;
 	struct sockaddr_qrtr dst;
 	struct sockaddr_qrtr src;
 	struct sk_buff *skb;
@@ -392,6 +393,14 @@ static void qrtr_node_rx_work(struct work_struct *work)
 		confirm = !!cb->confirm_rx;
 
 		qrtr_node_assign(node, cb->src_node);
+
+		/* Add the server node to the routing table in
+		 * case of QRTR_TYPE_NEW_SERVER messages */
+		if (cb->type == QRTR_TYPE_NEW_SERVER &&
+		    skb->len == sizeof(*msg)) {
+			msg = (void *)skb->data;
+			qrtr_node_assign(node, le32_to_cpu(msg->server.node));
+		}
 
 		ipc = qrtr_port_lookup(cb->dst_port);
 		if (!ipc) {
