@@ -22,6 +22,9 @@ struct qrtr_mhi_dev {
 	struct mhi_device *mhi_dev;
 	struct device *dev;
 	struct completion ul_done;
+	size_t bytes_to_rx;
+	size_t in_pkt_len;
+	void *in_pkt;
 };
 
 /* from mhi to qrtr */
@@ -29,15 +32,53 @@ static void qcom_mhi_qrtr_dl_callback(struct mhi_device *mhi_dev,
 				      struct mhi_result *mhi_res)
 {
 	struct qrtr_mhi_dev *qdev = dev_get_drvdata(&mhi_dev->dev);
+	int pkt_size;
 	int rc;
 
 	if (!qdev || mhi_res->transaction_status)
 		return;
 
-	rc = qrtr_endpoint_post(&qdev->ep, mhi_res->buf_addr,
-				mhi_res->bytes_xferd);
-	if (rc == -EINVAL)
-		dev_err(qdev->dev, "invalid ipcrouter packet\n");
+	/* Check for fragmentation */
+	if (!qdev->bytes_to_rx) {
+		pkt_size = qrtr_peek_pkt_size(mhi_res->buf_addr);
+
+		if (pkt_size <= mhi_res->bytes_xferd) {
+			/* No fragmentation, deliver to qrtr directly */
+			rc = qrtr_endpoint_post(&qdev->ep, mhi_res->buf_addr,
+						mhi_res->bytes_xferd);
+			if (rc == -EINVAL)
+				dev_err(qdev->dev,
+					"invalid ipcrouter packet\n");
+			return;
+		} else {
+			/* Create a buffer to hold the fragments */
+			qdev->bytes_to_rx = pkt_size;
+			qdev->in_pkt_len = 0;
+			qdev->in_pkt = kmalloc(qdev->bytes_to_rx, GFP_KERNEL);
+			if (!qdev->in_pkt) {
+				qdev->bytes_to_rx = 0;
+				dev_err(qdev->dev,
+					"unable to allocate in_pkt\n");
+				return;
+			}
+		}
+	}
+
+	/* Handle fragmentation */
+	memcpy(qdev->in_pkt + qdev->in_pkt_len, mhi_res->buf_addr,
+	       mhi_res->bytes_xferd);
+	qdev->in_pkt_len += mhi_res->bytes_xferd;
+	qdev->bytes_to_rx -= mhi_res->bytes_xferd;
+
+	if (!qdev->bytes_to_rx) {
+		rc = qrtr_endpoint_post(&qdev->ep, qdev->in_pkt,
+					qdev->in_pkt_len);
+		if (rc == -EINVAL)
+			dev_err(qdev->dev,
+				"invalid ipcrouter packet\n");
+		kfree(qdev->in_pkt);
+		qdev->in_pkt = NULL;
+	}
 }
 
 /* from mhi to qrtr */

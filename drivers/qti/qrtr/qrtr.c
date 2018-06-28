@@ -28,6 +28,7 @@
 #define QRTR_MAX_EPH_SOCKET 0x7fff
 
 #define QRTR_PORT_CTRL_LEGACY 0xffff
+#define QRTR_WORD_SIZE 4
 
 /**
  * struct qrtr_hdr_v1 - (I|R)PCrouter packet header version 1
@@ -56,7 +57,7 @@ struct qrtr_hdr_v1 {
  * @version: protocol version
  * @type: packet type; one of QRTR_TYPE_*
  * @flags: bitmask of QRTR_FLAGS_*
- * @optlen: length of optional header data
+ * @optlen: length of optional header data in number of words
  * @size: length of packet, excluding this header and optlen
  * @src_node_id: source node
  * @src_port_id: source port
@@ -253,6 +254,40 @@ static void qrtr_node_assign(struct qrtr_node *node, unsigned int nid)
 }
 
 /**
+ * qrtr_peek_pkt_size() - peek at the packet to see the size
+ * @data: data pointer
+ *
+ * Return: size of the packet on success; negative error code
+ * on failure
+ */
+u32 qrtr_peek_pkt_size(const void *data)
+{
+	const struct qrtr_hdr_v1 *v1;
+	const struct qrtr_hdr_v2 *v2;
+	u32 size;
+	u8 ver;
+
+	ver = *(u8 *)data;
+
+	switch (ver) {
+	case QRTR_PROTO_VER_1:
+		v1 = data;
+		size = sizeof(*v1) + le32_to_cpu(v1->size);
+		break;
+	case QRTR_PROTO_VER_2:
+		v2 = data;
+		size = sizeof(*v2) + (v2->optlen * QRTR_WORD_SIZE) +
+			le32_to_cpu(v2->size);
+		break;
+	default:
+		size = -1;
+		break;
+	}
+
+	return ALIGN(size, 4);
+}
+
+/**
  * qrtr_endpoint_post() - post incoming data
  * @ep: endpoint handle
  * @data: data pointer
@@ -299,7 +334,7 @@ int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len)
 		break;
 	case QRTR_PROTO_VER_2:
 		v2 = data;
-		hdrlen = sizeof(*v2) + v2->optlen;
+		hdrlen = sizeof(*v2) + (v2->optlen * QRTR_WORD_SIZE);
 
 		cb->type = v2->type;
 		cb->confirm_rx = !!(v2->flags & QRTR_FLAGS_CONFIRM_RX);
