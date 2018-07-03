@@ -48,8 +48,8 @@ do_unpack_extra () {
     if [ -e ${S}/arch/arm/boot/dts/imx6sx-sdb.dts ]; then
         echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6sx-sdb.dts
     fi
-    if [ -e ${S}/arch/arm64/boot/dts/fsl-imx8qxp-mek.dts ]; then
-        echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm64/boot/dts/fsl-imx8qxp-mek.dts
+    if [ -e ${S}/arch/arm64/boot/dts/freescale/fsl-imx8qxp-mek.dts ]; then
+        echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/fsl-imx8qxp-mek.dts
     fi
     cd ${S}
     git apply ${WORKDIR}/eap-qti-kernel/patches/0001-mhi_bus-core-Add-support-for-MHI-host-interface.patch
