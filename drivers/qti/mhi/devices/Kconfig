@@ -2,7 +2,7 @@ menu "MHI device support"
 
 config MHI_NETDEV
        tristate "MHI NETDEV"
-       depends on MHI_BUS
+       depends on MHI_BUS && RMNET_DATA
        help
 	  MHI based net device driver for transferring IP traffic
 	  between host and modem. By enabling this driver, clients
