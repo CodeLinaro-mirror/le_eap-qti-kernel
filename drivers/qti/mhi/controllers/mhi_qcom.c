@@ -526,6 +526,32 @@ error_iommu_init:
 	return ret;
 }
 
+static void mhi_pci_remove(struct pci_dev *pci_dev)
+{
+	struct mhi_controller *mhi_cntrl = NULL;
+	u32 domain = pci_domain_nr(pci_dev->bus);
+	u32 bus = pci_dev->bus->number;
+	/* first match to exact DT node, if not match to any free DT */
+	u32 dev_id[] = {pci_dev->device, PCI_ANY_ID};
+	u32 slot = PCI_SLOT(pci_dev->devfn);
+	int i;
+
+	/* find a matching controller */
+	for (i = 0; i < ARRAY_SIZE(dev_id); i++) {
+		mhi_cntrl = mhi_bdf_to_controller(domain, bus, slot, dev_id[i]);
+		if (mhi_cntrl)
+			break;
+	}
+
+	if (!mhi_cntrl)
+		return;
+
+	mhi_power_down(mhi_cntrl, true);
+	mhi_deinit_pci_dev(mhi_cntrl);
+	mhi_arch_iommu_deinit(mhi_cntrl);
+	mhi_arch_pcie_deinit(mhi_cntrl);
+}
+
 static const struct of_device_id mhi_plat_match[] = {
 	{ .compatible = "qcom,mhi" },
 	{},
@@ -655,6 +681,7 @@ static struct pci_driver mhi_pcie_driver = {
 	.name = "mhi",
 	.id_table = mhi_pcie_device_id,
 	.probe = mhi_pci_probe,
+	.remove = mhi_pci_remove,
 	.driver = {
 		.pm = &pm_ops
 	}
