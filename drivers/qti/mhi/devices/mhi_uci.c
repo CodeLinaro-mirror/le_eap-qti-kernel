@@ -228,7 +228,7 @@ static ssize_t mhi_uci_write(struct file *file,
 	struct mhi_device *mhi_dev = uci_dev->mhi_dev;
 	struct uci_chan *uci_chan = &uci_dev->ul_chan;
 	size_t bytes_xfered = 0;
-	int ret;
+	int ret, nr_avail;
 
 	if (!buf || !count)
 		return -EINVAL;
@@ -252,11 +252,11 @@ static ssize_t mhi_uci_write(struct file *file,
 		/* wait for free descriptors */
 		ret = wait_event_interruptible(uci_chan->wq,
 			(!uci_dev->enabled) ||
-			mhi_get_no_free_descriptors
-					       (mhi_dev, DMA_TO_DEVICE) > 0);
+			(nr_avail = mhi_get_no_free_descriptors(mhi_dev,
+							DMA_TO_DEVICE)) > 0);
 
-		if (ret == -ERESTARTSYS) {
-			MSG_LOG("Exit signal caught for node\n");
+		if (ret == -ERESTARTSYS || !uci_dev->enabled) {
+			MSG_LOG("Exit signal caught for node or not enabled\n");
 			return -ERESTARTSYS;
 		}
 
@@ -274,7 +274,13 @@ static ssize_t mhi_uci_write(struct file *file,
 		}
 
 		spin_lock_bh(&uci_chan->lock);
-		flags = (count - xfer_size) ? MHI_EOB : MHI_EOT;
+
+		/* if ring is full after this force EOT */
+		if (nr_avail > 1 && (count - xfer_size))
+			flags = MHI_CHAIN;
+		else
+			flags = MHI_EOT;
+
 		if (uci_dev->enabled)
 			ret = mhi_queue_transfer(mhi_dev, DMA_TO_DEVICE, kbuf,
 						 xfer_size, flags);
@@ -511,8 +517,8 @@ static void mhi_uci_remove(struct mhi_device *mhi_dev)
 		return;
 	}
 
-	mutex_unlock(&uci_dev->mutex);
 	MSG_LOG("Exit\n");
+	mutex_unlock(&uci_dev->mutex);
 }
 
 static int mhi_uci_probe(struct mhi_device *mhi_dev,
@@ -561,7 +567,7 @@ static int mhi_uci_probe(struct mhi_device *mhi_dev,
 		INIT_LIST_HEAD(&uci_chan->pending);
 	};
 
-	uci_dev->mtu = id->driver_data;
+	uci_dev->mtu = min_t(size_t, id->driver_data, mhi_dev->mtu);
 	mhi_device_set_devdata(mhi_dev, uci_dev);
 	uci_dev->enabled = true;
 
@@ -624,7 +630,7 @@ static const struct mhi_device_id mhi_uci_match_table[] = {
 	{ .chan = "TF", .driver_data = 0x1000 },
 	{ .chan = "BL", .driver_data = 0x1000 },
 	{ .chan = "DUN", .driver_data = 0x1000 },
-	{ NULL },
+	{},
 };
 
 static struct mhi_driver mhi_uci_driver = {

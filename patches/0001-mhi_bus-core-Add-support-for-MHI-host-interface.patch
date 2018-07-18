@@ -1,4 +1,4 @@
-From 371e6bb53c8f2aa64737cbc908e6942442f030d1 Mon Sep 17 00:00:00 2001
+From 34e7390651ded18f60b98b408e97f9e465e37ac3 Mon Sep 17 00:00:00 2001
 From: Sujeev Dias <sdias@codeaurora.org>
 Date: Wed, 7 Feb 2018 14:04:35 -0800
 Subject: [PATCH] mhi_bus: core: Add support for MHI host interface
@@ -12,17 +12,19 @@ CRs-Fixed: 2204910
 Change-Id: I6057f9167ebbb5d4dc2ebb91e46ede6bc7054325
 Signed-off-by: Sujeev Dias <sdias@codeaurora.org>
 ---
- include/linux/mod_devicetable.h | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ include/linux/mod_devicetable.h | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/include/linux/mod_devicetable.h b/include/linux/mod_devicetable.h
-index 545db52..76b4958 100644
+index ed84c07..20d8076 100644
 --- a/include/linux/mod_devicetable.h
 +++ b/include/linux/mod_devicetable.h
-@@ -705,5 +705,18 @@ struct fsl_mc_device_id {
+@@ -672,5 +672,17 @@ struct fsl_mc_device_id {
  	const char obj_type[16];
  };
  
++#define MHI_NAME_SIZE 32
++
 +/**
 + * struct mhi_device_id - MHI device identification
 + * @chan: MHI channel name
@@ -30,12 +32,9 @@ index 545db52..76b4958 100644
 + */
 +
 +struct mhi_device_id {
-+	const char *chan;
++	const char chan[MHI_NAME_SIZE];
 +	kernel_ulong_t driver_data;
 +};
-+
-+
-+
  
  #endif /* LINUX_MOD_DEVICETABLE_H */
 -- 

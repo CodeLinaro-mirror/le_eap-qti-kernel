@@ -952,10 +952,9 @@ static int mhi_netdev_probe(struct mhi_device *mhi_dev,
 }
 
 static const struct mhi_device_id mhi_netdev_match_table[] = {
-	{ .chan = "IP_HW0" },
-	{ .chan = "IP_HW_ADPL" },
-	{ .chan = "IP_SW0" },
-	{ NULL },
+	{ .chan = "IP_HW_0" },
+	{ .chan = "IP_SW_0" },
+	{},
 };
 
 static struct mhi_driver mhi_netdev_driver = {
