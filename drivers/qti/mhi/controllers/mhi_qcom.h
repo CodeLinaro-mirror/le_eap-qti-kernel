@@ -31,7 +31,6 @@ struct mhi_dev {
 	int resn;
 	void *arch_info;
 	bool powered_on;
-	bool debug_mode;
 	dma_addr_t iova_start;
 	dma_addr_t iova_stop;
 };
@@ -59,15 +58,6 @@ static inline int mhi_arch_pcie_init(struct mhi_controller *mhi_cntrl)
 }
 
 static inline void mhi_arch_pcie_deinit(struct mhi_controller *mhi_cntrl)
-{
-}
-
-static inline int mhi_arch_platform_init(struct mhi_dev *mhi_dev)
-{
-	return 0;
-}
-
-static inline void mhi_arch_platform_deinit(struct mhi_dev *mhi_dev)
 {
 }
 
