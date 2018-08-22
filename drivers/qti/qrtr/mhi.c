@@ -75,7 +75,7 @@ static void qcom_mhi_qrtr_dl_callback(struct mhi_device *mhi_dev,
 			/* Create a buffer to hold the fragments */
 			qdev->bytes_to_rx = pkt_size;
 			qdev->in_pkt_len = 0;
-			qdev->in_pkt = kmalloc(qdev->bytes_to_rx, GFP_KERNEL);
+			qdev->in_pkt = kmalloc(qdev->bytes_to_rx, GFP_ATOMIC);
 			if (!qdev->in_pkt) {
 				qdev->bytes_to_rx = 0;
 				dev_err(qdev->dev,

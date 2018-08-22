@@ -47,7 +47,7 @@ void mhi_deinit_pci_dev(struct mhi_controller *mhi_cntrl)
 	struct mhi_dev *mhi_dev = mhi_controller_get_devdata(mhi_cntrl);
 	struct pci_dev *pci_dev = mhi_dev->pci_dev;
 
-	pci_free_irq_vectors(pci_dev);
+	pci_disable_msi(pci_dev);
 	kfree(mhi_cntrl->irq);
 	mhi_cntrl->irq = NULL;
 	iounmap(mhi_cntrl->regs);
@@ -94,8 +94,8 @@ static int mhi_init_pci_dev(struct mhi_controller *mhi_cntrl)
 		goto error_ioremap;
 	}
 
-	ret = pci_alloc_irq_vectors(pci_dev, mhi_cntrl->msi_required,
-				    mhi_cntrl->msi_required, PCI_IRQ_MSI);
+	ret = pci_enable_msi_range(pci_dev, mhi_cntrl->msi_required,
+				   mhi_cntrl->msi_required);
 	if (IS_ERR_VALUE((ulong)ret) || ret < mhi_cntrl->msi_required) {
 		MHI_ERR("Failed to enable MSI, ret:%d\n", ret);
 		goto error_req_msi;
@@ -110,7 +110,7 @@ static int mhi_init_pci_dev(struct mhi_controller *mhi_cntrl)
 	}
 
 	for (i = 0; i < mhi_cntrl->msi_allocated; i++) {
-		mhi_cntrl->irq[i] = pci_irq_vector(pci_dev, i);
+		mhi_cntrl->irq[i] = pci_dev->irq + i;
 		if (mhi_cntrl->irq[i] < 0) {
 			ret = mhi_cntrl->irq[i];
 			goto error_get_irq_vec;
@@ -144,7 +144,7 @@ error_get_irq_vec:
 	mhi_cntrl->irq = NULL;
 
 error_alloc_msi_vec:
-	pci_free_irq_vectors(pci_dev);
+	pci_disable_msi(pci_dev);
 
 error_req_msi:
 	iounmap(mhi_cntrl->regs);
