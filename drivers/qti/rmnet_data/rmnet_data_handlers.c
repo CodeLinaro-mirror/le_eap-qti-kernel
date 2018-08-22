@@ -31,7 +31,7 @@
 
 RMNET_LOG_MODULE(RMNET_DATA_LOGMASK_HANDLER);
 
-#ifdef CONFIG_RMNET_DATA_DEBUG_PKT
+#ifdef CONFIG_QTI_RMNET_DATA_DEBUG_PKT
 unsigned int dump_pkt_rx;
 module_param(dump_pkt_rx, uint, 0644);
 MODULE_PARM_DESC(dump_pkt_rx, "Dump packets entering ingress handler");
@@ -39,7 +39,7 @@ MODULE_PARM_DESC(dump_pkt_rx, "Dump packets entering ingress handler");
 unsigned int dump_pkt_tx;
 module_param(dump_pkt_tx, uint, 0644);
 MODULE_PARM_DESC(dump_pkt_tx, "Dump packets exiting egress handler");
-#endif /* CONFIG_RMNET_DATA_DEBUG_PKT */
+#endif /* CONFIG_QTI_RMNET_DATA_DEBUG_PKT */
 
 static bool gro_flush_logic_on __read_mostly = 1;
 module_param(gro_flush_logic_on, bool, 0644);
@@ -97,7 +97,7 @@ static inline void __rmnet_data_set_skb_proto(struct sk_buff *skb)
 	}
 }
 
-#ifdef CONFIG_RMNET_DATA_DEBUG_PKT
+#ifdef CONFIG_QTI_RMNET_DATA_DEBUG_PKT
 /* rmnet_print_packet() - Print packet / diagnostics
  * @skb:      Packet to print
  * @printlen: Number of bytes to print
@@ -165,7 +165,7 @@ void rmnet_print_packet(const struct sk_buff *skb, const char *dev, char dir)
 void rmnet_print_packet(const struct sk_buff *skb, const char *dev, char dir)
 {
 }
-#endif /* CONFIG_RMNET_DATA_DEBUG_PKT */
+#endif /* CONFIG_QTI_RMNET_DATA_DEBUG_PKT */
 
 /* Generic handler */
 

@@ -157,7 +157,7 @@ static int rmnet_vnd_change_mtu(struct net_device *dev, int new_mtu)
 	return 0;
 }
 
-#ifdef CONFIG_RMNET_DATA_FC
+#ifdef CONFIG_QTI_RMNET_DATA_FC
 static int _rmnet_vnd_do_qos_ioctl(struct net_device *dev,
 				   struct ifreq *ifr,
 				   int cmd)
@@ -289,7 +289,7 @@ static inline int _rmnet_vnd_do_flow_control(struct net_device *dev,
 	LOGD("[%s] called with no QoS support", dev->name);
 	return RMNET_VND_FC_NOT_ENABLED;
 }
-#endif /* CONFIG_RMNET_DATA_FC */
+#endif /* CONFIG_QTI_RMNET_DATA_FC */
 
 static int rmnet_vnd_ioctl_extended(struct net_device *dev, struct ifreq *ifr)
 {

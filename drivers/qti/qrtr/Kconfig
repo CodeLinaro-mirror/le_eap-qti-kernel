@@ -1,7 +1,7 @@
 # Qualcomm IPC Router configuration
 #
 
-config QRTR_QTI
+config QTI_QRTR
 	tristate "Qualcomm IPC Router support"
 	---help---
 	  Say Y if you intend to use Qualcomm IPC router protocol.  The
@@ -11,18 +11,18 @@ config QRTR_QTI
 	  In order to do service lookups, a userspace daemon is required to
 	  maintain a service listing.
 
-if QRTR_QTI
+if QTI_QRTR
 
-config QRTR_QTI_SMD
+config QTI_QRTR_SMD
 	tristate "SMD IPC Router channels"
 	depends on RPMSG || (COMPILE_TEST && RPMSG=n)
 	---help---
 	  Say Y here to support SMD based ipcrouter channels.  SMD is the
 	  most common transport for IPC Router.
 
-config QRTR_QTI_MHI
+config QTI_QRTR_MHI
 	tristate "MHI IPC Router channels"
-	depends on MHI_BUS || (COMPILE_TEST && MHI_BUS=n)
+	depends on QTI_MHI_BUS || (COMPILE_TEST && QTI_MHI_BUS=n)
 	---help---
 	  Say Y here to support MHI based ipcrouter channels.  MHI is the
 	  transport used for external modem connections for IPC Router.

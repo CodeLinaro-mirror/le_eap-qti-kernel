@@ -603,7 +603,7 @@ int mhi_force_rddm_mode(struct mhi_controller *mhi_cntrl);
 
 #ifndef CONFIG_IPC_LOGGING
 
-#ifdef CONFIG_MHI_DEBUG
+#ifdef CONFIG_QTI_MHI_DEBUG
 
 #define MHI_VERB(fmt, ...) do { \
 		if (mhi_cntrl->klog_lvl <= MHI_MSG_LVL_VERBOSE) \
@@ -635,7 +635,7 @@ int mhi_force_rddm_mode(struct mhi_controller *mhi_cntrl);
 
 #include <linux/ipc_logging.h>
 
-#ifdef CONFIG_MHI_DEBUG
+#ifdef CONFIG_QTI_MHI_DEBUG
 
 #define MHI_VERB(fmt, ...) do { \
 		if (mhi_cntrl->klog_lvl <= MHI_MSG_LVL_VERBOSE) \

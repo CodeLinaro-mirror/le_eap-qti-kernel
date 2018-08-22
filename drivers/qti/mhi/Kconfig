@@ -1,4 +1,4 @@
-config MHI_BUS
+config QTI_MHI_BUS
 	tristate "Modem Host Interface"
 	help
 	  MHI Host Interface is a communication protocol to be used by the host
@@ -6,9 +6,9 @@ config MHI_BUS
 	  Enabling this module will allow host to communicate with external
 	  devices that support MHI protocol.
 
-config MHI_DEBUG
+config QTI_MHI_DEBUG
 	bool "MHI debug support"
-	depends on MHI_BUS
+	depends on QTI_MHI_BUS
 	help
 	  Say yes here to enable debugging support in the MHI transport
 	  and individual MHI client drivers. This option will impact
