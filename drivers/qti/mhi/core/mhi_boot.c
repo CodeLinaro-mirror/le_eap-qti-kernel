@@ -50,7 +50,7 @@ static int __mhi_download_rddm_in_panic(struct mhi_controller *mhi_cntrl)
 	struct mhi_buf *mhi_buf;
 	u32 sequence_id;
 	u32 rx_status;
-	enum MHI_EE ee;
+	enum mhi_ee ee;
 	struct image_info *rddm_image = mhi_cntrl->rddm_image;
 	const u32 delayus = 100;
 	u32 retry = (mhi_cntrl->timeout_ms * 1000) / delayus;
@@ -268,15 +268,13 @@ static int mhi_fw_load_amss(struct mhi_controller *mhi_cntrl,
 }
 
 static int mhi_fw_load_sbl(struct mhi_controller *mhi_cntrl,
-			   void *buf,
+			   dma_addr_t dma_addr,
 			   size_t size)
 {
 	u32 tx_status, val;
 	int i, ret;
 	void __iomem *base = mhi_cntrl->bhi;
 	rwlock_t *pm_lock = &mhi_cntrl->pm_lock;
-	dma_addr_t dma_addr = dma_map_single(mhi_cntrl->dev, buf, size,
-					     DMA_TO_DEVICE);
 	struct {
 		char *name;
 		u32 offset;
@@ -287,9 +285,6 @@ static int mhi_fw_load_sbl(struct mhi_controller *mhi_cntrl,
 		{ "ERROR_DBG3", BHI_ERRDBG3 },
 		{ NULL },
 	};
-
-	if (dma_mapping_error(mhi_cntrl->dev, dma_addr))
-		return -ENOMEM;
 
 	MHI_LOG("Starting BHI programming\n");
 
@@ -339,12 +334,9 @@ static int mhi_fw_load_sbl(struct mhi_controller *mhi_cntrl,
 		goto invalid_pm_state;
 	}
 
-	dma_unmap_single(mhi_cntrl->dev, dma_addr, size, DMA_TO_DEVICE);
-
 	return (tx_status == BHI_STATUS_SUCCESS) ? 0 : -ETIMEDOUT;
 
 invalid_pm_state:
-	dma_unmap_single(mhi_cntrl->dev, dma_addr, size, DMA_TO_DEVICE);
 
 	return -EIO;
 }
@@ -462,6 +454,7 @@ void mhi_fw_load_worker(struct work_struct *work)
 	const struct firmware *firmware;
 	struct image_info *image_info;
 	void *buf;
+	dma_addr_t dma_addr;
 	size_t size;
 
 	mhi_cntrl = container_of(work, struct mhi_controller, fw_worker);
@@ -506,7 +499,7 @@ void mhi_fw_load_worker(struct work_struct *work)
 	if (size > firmware->size)
 		size = firmware->size;
 
-	buf = kmemdup(firmware->data, size, GFP_KERNEL);
+	buf = mhi_alloc_coherent(mhi_cntrl, size, &dma_addr, GFP_KERNEL);
 	if (!buf) {
 		MHI_ERR("Could not allocate memory for image\n");
 		release_firmware(firmware);
@@ -514,8 +507,9 @@ void mhi_fw_load_worker(struct work_struct *work)
 	}
 
 	/* load sbl image */
-	ret = mhi_fw_load_sbl(mhi_cntrl, buf, size);
-	kfree(buf);
+	memcpy(buf, firmware->data, size);
+	ret = mhi_fw_load_sbl(mhi_cntrl, dma_addr, size);
+	mhi_free_coherent(mhi_cntrl, size, buf, dma_addr);
 
 	if (!mhi_cntrl->fbc_download || ret || mhi_cntrl->ee == MHI_EE_EDL)
 		release_firmware(firmware);
@@ -562,9 +556,9 @@ void mhi_fw_load_worker(struct work_struct *work)
 		goto error_read;
 	}
 
-	/* wait for BHIE event */
+	/* wait for SBL event */
 	ret = wait_event_timeout(mhi_cntrl->state_event,
-				 mhi_cntrl->ee == MHI_EE_BHIE ||
+				 mhi_cntrl->ee == MHI_EE_SBL ||
 				 MHI_PM_IN_ERROR_STATE(mhi_cntrl->pm_state),
 				 msecs_to_jiffies(mhi_cntrl->timeout_ms));
 

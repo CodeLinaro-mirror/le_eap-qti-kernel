@@ -32,11 +32,15 @@ struct firmware_info {
 };
 
 static const struct firmware_info firmware_table[] = {
+	{.dev_id = 0x306, .fw_image = "sbl1.mbn"},
 	{.dev_id = 0x305, .fw_image = "sdx50m/sbl1.mbn"},
 	{.dev_id = 0x304, .fw_image = "sbl.mbn", .edl_image = "edl.mbn"},
 	/* default, set to debug.mbn */
 	{.fw_image = "debug.mbn"},
 };
+
+static int debug_mode;
+module_param_named(debug_mode, debug_mode, int, 0644);
 
 void mhi_deinit_pci_dev(struct mhi_controller *mhi_cntrl)
 {
@@ -254,12 +258,18 @@ static int mhi_system_resume(struct device *dev)
 int mhi_system_suspend(struct device *dev)
 {
 	struct mhi_controller *mhi_cntrl = dev_get_drvdata(dev);
+	int ret;
 
 	MHI_LOG("Entered\n");
 
 	/* if rpm status still active then force suspend */
-	if (!pm_runtime_status_suspended(dev))
-		return mhi_runtime_suspend(dev);
+	if (!pm_runtime_status_suspended(dev)) {
+		ret = mhi_runtime_suspend(dev);
+		if (ret) {
+			MHI_LOG("suspend failed ret:%d\n", ret);
+			return ret;
+		}
+	}
 
 	pm_runtime_set_suspended(dev);
 	pm_runtime_disable(dev);
@@ -340,6 +350,62 @@ DEFINE_SIMPLE_ATTRIBUTE(debugfs_trigger_m0_fops, NULL,
 
 DEFINE_SIMPLE_ATTRIBUTE(debugfs_trigger_m3_fops, NULL,
 			mhi_debugfs_trigger_m3, "%llu\n");
+
+static ssize_t timeout_ms_show(struct device *dev,
+			       struct device_attribute *attr,
+			       char *buf)
+{
+	struct mhi_device *mhi_dev = to_mhi_device(dev);
+	struct mhi_controller *mhi_cntrl = mhi_dev->mhi_cntrl;
+
+	/* buffer provided by sysfs has a minimum size of PAGE_SIZE */
+	return snprintf(buf, PAGE_SIZE, "%u\n", mhi_cntrl->timeout_ms);
+}
+
+static ssize_t timeout_ms_store(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf,
+				size_t count)
+{
+	struct mhi_device *mhi_dev = to_mhi_device(dev);
+	struct mhi_controller *mhi_cntrl = mhi_dev->mhi_cntrl;
+	u32 timeout_ms;
+
+	if (kstrtou32(buf, 0, &timeout_ms) < 0)
+		return -EINVAL;
+
+	mhi_cntrl->timeout_ms = timeout_ms;
+
+	return count;
+}
+static DEVICE_ATTR_RW(timeout_ms);
+
+static ssize_t power_up_store(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *buf,
+			      size_t count)
+{
+	int ret;
+	struct mhi_device *mhi_dev = to_mhi_device(dev);
+	struct mhi_controller *mhi_cntrl = mhi_dev->mhi_cntrl;
+
+	ret = mhi_async_power_up(mhi_cntrl);
+	if (ret)
+		return ret;
+
+	return count;
+}
+static DEVICE_ATTR_WO(power_up);
+
+static struct attribute *mhi_qcom_attrs[] = {
+	&dev_attr_timeout_ms.attr,
+	&dev_attr_power_up.attr,
+	NULL
+};
+
+static const struct attribute_group mhi_qcom_group = {
+	.attrs = mhi_qcom_attrs,
+};
 
 int mhi_pci_probe(struct pci_dev *pci_dev,
 		  const struct pci_device_id *device_id)
@@ -522,13 +588,13 @@ static int mhi_platform_probe(struct platform_device *pdev)
 	mhi_cntrl->iova_stop = mhi_dev->iova_stop;
 	mhi_cntrl->of_node = of_node;
 
+	mhi_dev->pdev = pdev;
+
 	/* setup power management apis */
 	mhi_cntrl->status_cb = mhi_status_cb;
 	mhi_cntrl->runtime_get = mhi_runtime_get;
 	mhi_cntrl->runtime_put = mhi_runtime_put;
 	mhi_cntrl->link_status = mhi_link_status;
-
-	mhi_dev->pdev = pdev;
 
 	ret = of_register_mhi_controller(mhi_cntrl);
 	if (ret)
@@ -536,12 +602,16 @@ static int mhi_platform_probe(struct platform_device *pdev)
 
 	for (i = 0; i < ARRAY_SIZE(firmware_table); i++) {
 		firmware_info = firmware_table + i;
-		if (mhi_cntrl->dev_id == firmware_info->dev_id)
+
+		/* debug mode always use default */
+		if (!debug_mode && mhi_cntrl->dev_id == firmware_info->dev_id)
 			break;
 	}
 
 	mhi_cntrl->fw_image = firmware_info->fw_image;
 	mhi_cntrl->edl_image = firmware_info->edl_image;
+
+	sysfs_create_group(&mhi_cntrl->mhi_dev->dev.kobj, &mhi_qcom_group);
 
 	return 0;
 
@@ -574,6 +644,7 @@ static struct pci_device_id mhi_pcie_device_id[] = {
 	{PCI_DEVICE(MHI_PCIE_VENDOR_ID, 0x0303)},
 	{PCI_DEVICE(MHI_PCIE_VENDOR_ID, 0x0304)},
 	{PCI_DEVICE(MHI_PCIE_VENDOR_ID, 0x0305)},
+	{PCI_DEVICE(MHI_PCIE_VENDOR_ID, 0x0306)},
 	{PCI_DEVICE(MHI_PCIE_VENDOR_ID, MHI_PCIE_DEBUG_ID)},
 	{0},
 };

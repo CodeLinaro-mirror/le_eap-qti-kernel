@@ -40,7 +40,7 @@
 			mhi,chan-dir = <1>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@1 {
@@ -51,7 +51,7 @@
 			mhi,chan-dir = <2>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@2 {
@@ -62,7 +62,7 @@
 			mhi,chan-dir = <1>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <1>;
+			mhi,ee = <0x2>;
 		};
 
 		mhi_chan@3 {
@@ -73,7 +73,7 @@
 			mhi,chan-dir = <2>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <1>;
+			mhi,ee = <0x2>;
 		};
 
 		mhi_chan@4 {
@@ -84,7 +84,7 @@
 			mhi,chan-dir = <1>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@5 {
@@ -95,7 +95,7 @@
 			mhi,chan-dir = <2>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@8 {
@@ -106,7 +106,7 @@
 			mhi,chan-dir = <1>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@9 {
@@ -117,7 +117,7 @@
 			mhi,chan-dir = <2>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@10 {
@@ -128,7 +128,7 @@
 			mhi,chan-dir = <1>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@11 {
@@ -139,7 +139,7 @@
 			mhi,chan-dir = <2>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@14 {
@@ -150,7 +150,7 @@
 			mhi,chan-dir = <1>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@15 {
@@ -161,7 +161,7 @@
 			mhi,chan-dir = <2>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@16 {
@@ -172,7 +172,7 @@
 			mhi,chan-dir = <1>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@17 {
@@ -183,7 +183,7 @@
 			mhi,chan-dir = <2>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@18 {
@@ -194,7 +194,7 @@
 			mhi,chan-dir = <1>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@19 {
@@ -205,7 +205,7 @@
 			mhi,chan-dir = <2>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 			mhi,auto-queue;
 		};
 
@@ -217,7 +217,7 @@
 			mhi,chan-dir = <1>;
 			mhi,data-type = <1>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 			mhi,auto-start;
 		};
 
@@ -229,7 +229,7 @@
 			mhi,chan-dir = <2>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 			mhi,auto-queue;
 			mhi,auto-start;
 		};
@@ -242,7 +242,7 @@
 			mhi,chan-dir = <1>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@23 {
@@ -253,18 +253,7 @@
 			mhi,chan-dir = <2>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
-		};
-
-		mhi_chan@24 {
-			reg = <24>;
-			label = "BL";
-			mhi,num-elements = <64>;
-			mhi,event-ring = <2>;
-			mhi,chan-dir = <1>;
-			mhi,data-type = <0>;
-			mhi,doorbell-mode = <2>;
-			mhi,ee = <1>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@25 {
@@ -275,7 +264,9 @@
 			mhi,chan-dir = <2>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <1>;
+			mhi,ee = <0x2>;
+			mhi,auto-queue;
+			mhi,auto-start;
 		};
 
 		mhi_chan@26 {
@@ -286,7 +277,7 @@
 			mhi,chan-dir = <1>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@27 {
@@ -297,7 +288,7 @@
 			mhi,chan-dir = <2>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@32 {
@@ -308,7 +299,7 @@
 			mhi,chan-dir = <1>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@33 {
@@ -319,7 +310,7 @@
 			mhi,chan-dir = <2>;
 			mhi,data-type = <0>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@46 {
@@ -330,7 +321,7 @@
 			mhi,chan-dir = <1>;
 			mhi,data-type = <1>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@47 {
@@ -341,7 +332,7 @@
 			mhi,chan-dir = <2>;
 			mhi,data-type = <1>;
 			mhi,doorbell-mode = <2>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_chan@100 {
@@ -352,7 +343,7 @@
 			mhi,chan-dir = <1>;
 			mhi,data-type = <1>;
 			mhi,doorbell-mode = <3>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 			mhi,db-mode-switch;
 		};
 
@@ -364,7 +355,7 @@
 			mhi,chan-dir = <2>;
 			mhi,data-type = <1>;
 			mhi,doorbell-mode = <3>;
-			mhi,ee = <2>;
+			mhi,ee = <0x4>;
 		};
 
 		mhi_event@0 {

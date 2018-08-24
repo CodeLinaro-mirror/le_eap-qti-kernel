@@ -27,8 +27,8 @@ const char * const mhi_ee_str[MHI_EE_MAX] = {
 	[MHI_EE_PBL] = "PBL",
 	[MHI_EE_SBL] = "SBL",
 	[MHI_EE_AMSS] = "AMSS",
-	[MHI_EE_BHIE] = "BHIE",
 	[MHI_EE_RDDM] = "RDDM",
+	[MHI_EE_WFW] = "WFW",
 	[MHI_EE_PTHRU] = "PASS THRU",
 	[MHI_EE_EDL] = "EDL",
 	[MHI_EE_DISABLE_TRANSITION] = "DISABLE",
@@ -38,8 +38,7 @@ const char * const mhi_state_tran_str[MHI_ST_TRANSITION_MAX] = {
 	[MHI_ST_TRANSITION_PBL] = "PBL",
 	[MHI_ST_TRANSITION_READY] = "READY",
 	[MHI_ST_TRANSITION_SBL] = "SBL",
-	[MHI_ST_TRANSITION_AMSS] = "AMSS",
-	[MHI_ST_TRANSITION_BHIE] = "BHIE",
+	[MHI_ST_TRANSITION_MISSION_MODE] = "MISSION MODE",
 };
 
 const char * const mhi_state_str[MHI_STATE_MAX] = {
@@ -54,20 +53,18 @@ const char * const mhi_state_str[MHI_STATE_MAX] = {
 };
 
 static const char * const mhi_pm_state_str[] = {
-	"DISABLE",
-	"POR",
-	"M0",
-	"M1",
-	"M1->M2",
-	"M2",
-	"M?->M3",
-	"M3",
-	"M3->M0",
-	"FW DL Error",
-	"SYS_ERR Detect",
-	"SYS_ERR Process",
-	"SHUTDOWN Process",
-	"LD or Error Fatal Detect",
+	[MHI_PM_BIT_DISABLE] = "DISABLE",
+	[MHI_PM_BIT_POR] = "POR",
+	[MHI_PM_BIT_M0] = "M0",
+	[MHI_PM_BIT_M2] = "M2",
+	[MHI_PM_BIT_M3_ENTER] = "M?->M3",
+	[MHI_PM_BIT_M3] = "M3",
+	[MHI_PM_BIT_M3_EXIT] = "M3->M0",
+	[MHI_PM_BIT_FW_DL_ERR] = "FW DL Error",
+	[MHI_PM_BIT_SYS_ERR_DETECT] = "SYS_ERR Detect",
+	[MHI_PM_BIT_SYS_ERR_PROCESS] = "SYS_ERR Process",
+	[MHI_PM_BIT_SHUTDOWN_PROCESS] = "SHUTDOWN Process",
+	[MHI_PM_BIT_LD_ERR_FATAL_DETECT] = "LD or Error Fatal Detect",
 };
 
 struct mhi_bus mhi_bus;
@@ -902,8 +899,8 @@ static int of_parse_ch_cfg(struct mhi_controller *mhi_cntrl,
 		if (ret)
 			goto error_chan_cfg;
 
-		ret = of_property_read_u32(child, "mhi,ee", &mhi_chan->ee);
-		if (ret || mhi_chan->ee >= MHI_EE_MAX_SUPPORTED)
+		ret = of_property_read_u32(child, "mhi,ee", &mhi_chan->ee_mask);
+		if (ret)
 			goto error_chan_cfg;
 
 		of_property_read_u32(child, "mhi,pollcfg",
@@ -1087,7 +1084,6 @@ int of_register_mhi_controller(struct mhi_controller *mhi_cntrl)
 	spin_lock_init(&mhi_cntrl->wlock);
 	INIT_WORK(&mhi_cntrl->st_worker, mhi_pm_st_worker);
 	INIT_WORK(&mhi_cntrl->fw_worker, mhi_fw_load_worker);
-	INIT_WORK(&mhi_cntrl->m1_worker, mhi_pm_m1_worker);
 	INIT_WORK(&mhi_cntrl->syserr_worker, mhi_pm_sys_err_worker);
 	init_waitqueue_head(&mhi_cntrl->state_event);
 
@@ -1398,12 +1394,14 @@ static int mhi_driver_remove(struct device *dev)
 		mutex_lock(&mhi_chan->mutex);
 		write_lock_irq(&mhi_chan->lock);
 		ch_state[dir] = mhi_chan->ch_state;
-		mhi_chan->ch_state = MHI_CH_STATE_DISABLED;
+		mhi_chan->ch_state = MHI_CH_STATE_SUSPENDED;
 		write_unlock_irq(&mhi_chan->lock);
 
 		/* reset the channel */
 		if (!mhi_chan->offload_ch)
 			mhi_reset_chan(mhi_cntrl, mhi_chan);
+
+		mutex_unlock(&mhi_chan->mutex);
 	}
 
 	/* destroy the device */
@@ -1416,9 +1414,13 @@ static int mhi_driver_remove(struct device *dev)
 		if (!mhi_chan)
 			continue;
 
+		mutex_lock(&mhi_chan->mutex);
+
 		if (ch_state[dir] == MHI_CH_STATE_ENABLED &&
 		    !mhi_chan->offload_ch)
 			mhi_deinit_chan_ctxt(mhi_cntrl, mhi_chan);
+
+		mhi_chan->ch_state = MHI_CH_STATE_DISABLED;
 
 		/* remove associated device */
 		mhi_chan->mhi_dev = NULL;
