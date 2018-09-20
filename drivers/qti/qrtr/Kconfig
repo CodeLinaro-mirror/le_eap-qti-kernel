@@ -13,18 +13,17 @@ config QTI_QRTR
 
 if QTI_QRTR
 
-config QTI_QRTR_SMD
-	tristate "SMD IPC Router channels"
-	depends on RPMSG || (COMPILE_TEST && RPMSG=n)
-	---help---
-	  Say Y here to support SMD based ipcrouter channels.  SMD is the
-	  most common transport for IPC Router.
-
 config QTI_QRTR_MHI
 	tristate "MHI IPC Router channels"
 	depends on QTI_MHI_BUS || (COMPILE_TEST && QTI_MHI_BUS=n)
 	---help---
 	  Say Y here to support MHI based ipcrouter channels.  MHI is the
 	  transport used for external modem connections for IPC Router.
+
+config QTI_QRTR_USB
+	tristate "USB IPC Router channels"
+	depends on USB || (COMPILE_TEST && USB=n)
+	---help---
+	  Say Y here to support USB based ipcrouter channels.
 
 endif # QRTR_QTI
