@@ -56,6 +56,7 @@ do_unpack_extra () {
     git apply ${WORKDIR}/eap-qti-kernel/patches/0002-net-Add-the-get-current-NAPI-context-API.patch
     git apply ${WORKDIR}/eap-qti-kernel/patches/0003-msm_rmnet-merge-support-for-RAWIP-msm_rmnet-device.patch
     git apply ${WORKDIR}/eap-qti-kernel/patches/0004-net-rmnet_data-Add-snapshot-of-rmnet_data-driver.patch
+    git apply ${WORKDIR}/eap-qti-kernel/patches/0005-net-ipv6-Generate-random-IID-for-addresses-on-RAWIP-.patch
     cd -
 }
 

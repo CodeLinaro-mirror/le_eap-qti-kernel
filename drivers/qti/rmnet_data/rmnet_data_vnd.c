@@ -457,6 +457,10 @@ static void rmnet_vnd_setup(struct net_device *dev)
 	/* Flow control */
 	rwlock_init(&dev_conf->flow_map_lock);
 	INIT_LIST_HEAD(&dev_conf->flow_head);
+
+	/* This perm addr will be used as interface identifier by IPv6 */
+	dev->addr_assign_type = NET_ADDR_RANDOM;
+	eth_random_addr(dev->perm_addr);
 }
 
 /* rmnet_vnd_setup() - net_device initialization helper function
