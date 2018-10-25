@@ -165,10 +165,17 @@ static int mhi_runtime_suspend(struct device *dev)
 {
 	int ret = 0;
 	struct mhi_controller *mhi_cntrl = dev_get_drvdata(dev);
+	struct mhi_dev *mhi_dev = mhi_controller_get_devdata(mhi_cntrl);
 
 	MHI_LOG("Enter\n");
 
 	mutex_lock(&mhi_cntrl->pm_mutex);
+
+	if (!mhi_dev->powered_on) {
+		MHI_LOG("Not fully powered, return success\n");
+		mutex_unlock(&mhi_cntrl->pm_mutex);
+		return 0;
+	}
 
 	ret = mhi_pm_suspend(mhi_cntrl);
 	if (ret) {
@@ -447,9 +454,11 @@ int mhi_pci_probe(struct pci_dev *pci_dev,
 		goto error_init_pci;
 
 	/* start power up sequence */
-	ret = mhi_async_power_up(mhi_cntrl);
-	if (ret)
-		goto error_power_up;
+	if (!debug_mode) {
+		ret = mhi_async_power_up(mhi_cntrl);
+		if (ret)
+			goto error_power_up;
+	}
 
 	pm_runtime_mark_last_busy(&pci_dev->dev);
 	pm_runtime_allow(&pci_dev->dev);
