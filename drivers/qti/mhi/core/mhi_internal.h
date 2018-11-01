@@ -774,7 +774,7 @@ irqreturn_t mhi_intvec_threaded_handlr(int irq_number, void *dev);
 irqreturn_t mhi_intvec_handlr(int irq_number, void *dev);
 void mhi_ev_task(unsigned long data);
 
-#ifdef CONFIG_MHI_DEBUG
+#ifdef CONFIG_QTI_MHI_DEBUG
 
 #define MHI_ASSERT(cond, msg) do { \
 	if (cond) \

@@ -603,6 +603,13 @@ int mhi_force_rddm_mode(struct mhi_controller *mhi_cntrl);
 
 #ifndef CONFIG_IPC_LOGGING
 
+static inline int ipc_log_string(void *ilctxt, const char *fmt, ...)
+{ return -EINVAL; }
+
+static inline void *ipc_log_context_create(int max_num_pages,
+	const char *modname, uint16_t user_version)
+{ return NULL; }
+
 #ifdef CONFIG_QTI_MHI_DEBUG
 
 #define MHI_VERB(fmt, ...) do { \
@@ -631,7 +638,7 @@ int mhi_force_rddm_mode(struct mhi_controller *mhi_cntrl);
 			pr_alert("[C][%s] " fmt, __func__, ##__VA_ARGS__); \
 } while (0)
 
-#else /* ARCH QCOM */
+#else /* CONFIG_IPC_LOGGING */
 
 #include <linux/ipc_logging.h>
 

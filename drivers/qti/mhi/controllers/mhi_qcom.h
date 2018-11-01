@@ -57,8 +57,25 @@ static inline void mhi_arch_iommu_deinit(struct mhi_controller *mhi_cntrl)
 {
 }
 
+#ifdef CONFIG_QTI_MHI_DEBUG
+#define MHI_IPC_LOG_PAGES (100)
+#define MHI_IPC_LOG_LVL MHI_MSG_LVL_VERBOSE
+#else
+#define MHI_IPC_LOG_LVL MHI_MSG_LVL_ERROR
+#define MHI_IPC_LOG_PAGES (10)
+#endif
+
 static inline int mhi_arch_pcie_init(struct mhi_controller *mhi_cntrl)
 {
+	char node[32];
+
+	snprintf(node, sizeof(node), "mhi_%04x_%02u.%02u.%02u",
+		 mhi_cntrl->dev_id, mhi_cntrl->domain, mhi_cntrl->bus,
+		 mhi_cntrl->slot);
+	mhi_cntrl->log_buf = ipc_log_context_create(MHI_IPC_LOG_PAGES,
+						    node, 0);
+	mhi_cntrl->log_lvl = MHI_IPC_LOG_LVL;
+
 	return 0;
 }
 

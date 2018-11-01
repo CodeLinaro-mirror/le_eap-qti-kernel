@@ -26,8 +26,11 @@
 
 #define MHI_NETDEV_DRIVER_NAME "mhi_netdev"
 #define WATCHDOG_TIMEOUT (30 * HZ)
+#define IPC_LOG_PAGES (100)
 
-#ifdef CONFIG_MHI_DEBUG
+#ifdef CONFIG_QTI_MHI_DEBUG
+
+#define IPC_LOG_LVL (MHI_MSG_LVL_VERBOSE)
 
 #define MHI_ASSERT(cond, msg) do { \
 	if (cond) \
@@ -37,9 +40,15 @@
 #define MSG_VERB(fmt, ...) do { \
 	if (mhi_netdev->msg_lvl <= MHI_MSG_LVL_VERBOSE) \
 		pr_err("[D][%s] " fmt, __func__, ##__VA_ARGS__);\
+	if (mhi_netdev->ipc_log && (mhi_netdev->ipc_log_lvl <= \
+				    MHI_MSG_LVL_VERBOSE)) \
+		ipc_log_string(mhi_netdev->ipc_log, "[D][%s] " fmt, \
+			       __func__, ##__VA_ARGS__); \
 } while (0)
 
 #else
+
+#define IPC_LOG_LVL (MHI_MSG_LVL_ERROR)
 
 #define MHI_ASSERT(cond, msg) do { \
 	if (cond) { \
@@ -55,11 +64,19 @@
 #define MSG_LOG(fmt, ...) do { \
 	if (mhi_netdev->msg_lvl <= MHI_MSG_LVL_INFO) \
 		pr_err("[I][%s] " fmt, __func__, ##__VA_ARGS__);\
+	if (mhi_netdev->ipc_log && (mhi_netdev->ipc_log_lvl <= \
+				    MHI_MSG_LVL_INFO)) \
+		ipc_log_string(mhi_netdev->ipc_log, "[I][%s] " fmt, \
+			       __func__, ##__VA_ARGS__); \
 } while (0)
 
 #define MSG_ERR(fmt, ...) do { \
 	if (mhi_netdev->msg_lvl <= MHI_MSG_LVL_ERROR) \
 		pr_err("[E][%s] " fmt, __func__, ##__VA_ARGS__); \
+	if (mhi_netdev->ipc_log && (mhi_netdev->ipc_log_lvl <= \
+				    MHI_MSG_LVL_ERROR)) \
+		ipc_log_string(mhi_netdev->ipc_log, "[E][%s] " fmt, \
+			       __func__, ##__VA_ARGS__); \
 } while (0)
 
 struct mhi_stats {
@@ -89,6 +106,8 @@ struct mhi_netdev {
 	struct mhi_stats stats;
 	struct dentry *dentry;
 	enum MHI_DEBUG_LEVEL msg_lvl;
+	enum MHI_DEBUG_LEVEL ipc_log_lvl;
+	void *ipc_log;
 };
 
 struct mhi_netdev_priv {
@@ -809,7 +828,10 @@ static int mhi_netdev_probe(struct mhi_device *mhi_dev,
 	snprintf(node_name, sizeof(node_name), "%s_%04x_%02u.%02u.%02u_%u",
 		 mhi_netdev->interface_name, mhi_dev->dev_id, mhi_dev->domain,
 		 mhi_dev->bus, mhi_dev->slot, mhi_netdev->alias);
+	mhi_netdev->ipc_log = ipc_log_context_create(IPC_LOG_PAGES, node_name,
+						     0);
 	mhi_netdev->msg_lvl = MHI_MSG_LVL_ERROR;
+	mhi_netdev->ipc_log_lvl = IPC_LOG_LVL;
 
 	/* setup network interface */
 	ret = mhi_netdev_enable_iface(mhi_netdev);
