@@ -1,0 +1,239 @@
+		Linux USB bridge driver between host and device port
+
+Overview
+========
+
+A USB bridge driver provides the capability to bridge bulk endpoints between
+a USB host port and a USB device port on a system that has both USB host and
+device ports available. It allows the external host (connected via the device
+port on the system) to access bulk endpoints exported by the device attached
+to the host port of the system.
+
+The driver is based on the configfs linux framework that allows composite
+gadgets.
+
+This documentation describes how to configure the USB bridge.
+
+
+
+Requirements
+============
+
+This driver is for systems that have USB host port and USB device ports.
+The driver uses configfs to export the bulk endpoints as functions to the
+host system. It is required that CONFIGFS_FS must be enabled 'y' or 'm' in
+.config.
+
+Configfs gadget and configuration must be created before the bridge is
+initiated. Please see Documentation/usb/gadget_configfs.txt.
+
+
+
+Implementation Design
+=====================
+
+USB Bridge Driver has two major functional blocks:
+
+1. USB Bridge Interface Driver: Interacts with the USB host port on the apps
+processor and captures the interfaces and endpoints exposed by the device that
+are to be bridged. The file drivers/usb/misc/usb_bridge.c contains code for
+this.
+
+2.USB Bridge Function Driver: Sets up and bridges the interfaces and endpoints
+captured by the USB Bridge interface driver for the host to read. The file
+f_usb_bridge.c contains code for this.
+
+The interfaces that are to be bridged are selected via Config-fs framework. The
+bridge for each interface is switched on/off when they are enabled/disabled via
+config-fs. The driver allows other drivers/libusb to be able to claim the
+interface if the interface is not being bridged.
+
+The interface number "bInterfaceNumber" exposed by the device is used to map
+the interfaces between the Interface driver and Function driver. An interface
+can be bridged when the function corresponding to the respective interface
+number is enabled. The function corresponding to an interface is represented
+by the <function_name>.<interface_number> . The "instance name" field in the
+function name is used to identify the device interface that the respective
+function would map to.
+
+For example, to enable a bridge for "device interface 0", a function called
+"usb_bridge.0" should be created and  to enable a bridge for "device interface
+1", a function called "usb_bridge.1" should be created.
+
+1. USB Bridge Interface Driver
+------------------------------
+
+The interface driver maintains a list of interfaces that are
+exposed by the device. When a device is connected, this driver captures
+interface data such as interface descriptors and endpoint descriptors for all
+interfaces exposed by the device and adds them to a list. The interface is not
+claimed at this point.
+
+The interface driver claims the interface if the interface is enabled via
+Config-fs and a function instance is present for the corresponding interface.
+Doing so allows other drivers and/or libusb to claim the interface if needed.
+
+2. USB Bridge Function Driver
+-----------------------------
+
+The function driver is the bridge engine. When a function is enabled via
+config-fs, an instance of the function driver is created for the specific
+interface. This function instance is the interface that the external host
+would bind to in order to access the bridged interface.
+
+The following callbacks are called at various stages of the driver life-cycle:
+
+1. usb_bridge_bind: The driver bind callback is called after the function is
+enabled via config-fs. The bind callback iterates through the list of
+interfaces captured by the USB Bridge Interface Driver and searches for an
+interface that has an "interface number" matching the "function instance name".
+If no such interface exists in the list, the bind fails with an error. If such
+an interface exists in the list, the interface driver is probed to claim the
+interface. Once the interface is claimed, the function is setup by allocating
+and assigning various descriptors and endpoints identical to the ones exported
+by the USB device corresponding to this interface.
+
+2. usb_bridge_set_alt: The set_alt callback is called when the external host
+(PC or other device) connects to the device port on the Apps Processor. All
+endpoints are enabled and the bridge for the respective interface is setup in
+this callback. The driver sets up an endpoint request and urb request pair.
+This pair is used to transfer data between the USB device and the external
+host. The data transfer is done in the respective request callbacks.
+
+3. usb_bridge_disable: Disable is called when the external host detaches from
+the USB device port on the apps processor. It free's the endpoint requests and
+urbs allocated in ub_f_set_alt and disables the endpoints of the interface.
+ub_f_unbind: Unbind is called when the function is disassociated via config-fs.
+It reverses the effect of ub_f_bind and prompts the USB Bridge Interface Driver
+to release the interface the function corresponds to.
+
+
+
+Usage
+=====
+
+The driver captures the interface containing the bulk endpoints that are
+to be bridged. It is required to record the interface number from the device
+and then create the gadget functions corresponding to the interface.
+
+It is required for the device to be connected to the USB host before the
+bridge is initiated.
+
+1. Identifying interfaces that need to be bridged
+-------------------------------------------------
+
+After plugging in the USB device into the device port, identify the interfaces
+that contain the bulk endpoints to be bridged.
+The list of interfaces can be viewed using lsusb.
+
+$ lsusb -v -d <idVendor>:<idProduct>
+
+where <idVendor> is the vendor ID and <idProduct> is the product ID of the
+USB device connected to the device port.
+
+Record the interface number written next to "bInterfaceNumber". This number
+will be used to create the USB gadget function that will be exported on the
+device port.
+
+2. Bridging Interfaces
+----------------------
+
+The instance name of each function should be the interface number of the
+interface being bridged.
+
+Create functions in the gadget directory:
+
+$ cd /sys/kernel/config/usb_gadget/g1
+
+$ echo "" > UDC
+
+$ mkdir functions/usb_bridge.<interface number>
+
+$ ln -s functions/usb_bridge.<interface number> configs/<config name>.<config number>/
+
+$ echo <udc name> > UDC
+
+<udc name> can be found at /sys/class/udc/*
+
+e.g. setup for interface "0":
+
+$ cd /sys/kernel/config/usb_gadget/g1
+
+$ echo "" > UDC
+
+$ mkdir functions/usb_bridge.0
+
+$ ln -s functions/usb_bridge.0 configs/c.1/
+
+$ echo "6a00000.dwc3" > UDC
+
+This will enable the bridge for interface 0.
+
+Multiple interfaces can be bridged by creating and associating functions.
+e.g.:
+
+$ cd /sys/kernel/config/usb_gadget/g1
+
+$ echo "" > UDC
+
+$ mkdir functions/usb_bridge.0
+
+$ mkdir functions/usb_bridge.1
+
+...
+
+...
+
+...
+
+$ mkdir functions/usb_bridge.<n>
+
+$ ln -s functions/usb_bridge.0 configs/c.1/
+
+$ ln -s functions/usb_bridge.1 configs/c.1/
+
+...
+
+...
+
+...
+
+$ ln -s functions/usb_bridge.<n> configs/c.1/
+
+$ echo "6a00000.dwc3" > UDC
+
+
+3. Disabling the bridge
+-----------------------
+
+The USB bridge can be temporarily disabled by disabling the USB gadget.
+
+$ cd /sys/kernel/config/usb_gadget/g1
+
+$ echo "" > UDC
+
+To permanently disable an interface bridge, disable the gadget, remove
+function association and function corresponding to that interface and reenable
+the gadget.
+
+$ cd /sys/kernel/config/usb_gadget/g1
+
+$ echo "" > UDC
+
+$ rm -r configs/<config name>.<config number>/<function>
+
+$ rm -r functions/<function>
+
+$ echo <udc_name> > UDC
+
+e.g.
+
+$ cd /sys/kernel/config/usb_gadget/g1
+
+$ echo "" > UDC
+
+$ rm -r configs/c.1/usb_bridge.0
+
+$ rm -r functions/usb_bridge.0
+
+$ echo "6a00000.dwc3" > UDC
