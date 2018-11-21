@@ -388,6 +388,12 @@ static int rmnet_usb_probe(struct usb_interface *iface,
 
 	usb_enable_autosuspend(udev);
 
+	if (udev->parent && !udev->parent->parent) {
+		/* allow modem and roothub to wake up suspended system */
+		device_set_wakeup_enable(&udev->dev, 1);
+		device_set_wakeup_enable(&udev->parent->dev, 1);
+	}
+
 	return 0;
 }
 
@@ -395,6 +401,7 @@ static void rmnet_usb_disconnect(struct usb_interface *intf)
 {
 	struct usbnet *unet = usb_get_intfdata(intf);
 
+	device_set_wakeup_enable(&unet->udev->dev, 0);
 	rmnet_usb_debugfs_cleanup(unet);
 	usbnet_disconnect(intf);
 }
