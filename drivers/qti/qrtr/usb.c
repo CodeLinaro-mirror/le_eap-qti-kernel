@@ -104,9 +104,6 @@ static int qcom_usb_qrtr_rx_thread_fn(void *data)
 			usb_autopm_put_interface(qdev->iface);
 			dev_dbg(&qdev->udev->dev, "URB status %d",
 				in_urb->status);
-			/* Exit if the error is unrecoverable */
-			if (in_urb->status == -EPROTO)
-				break;
 			continue;
 		}
 
