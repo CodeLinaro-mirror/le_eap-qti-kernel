@@ -23,6 +23,7 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/mhi.h>
+#include <linux/version.h>
 #include "mhi_qcom.h"
 
 struct firmware_info {
@@ -94,8 +95,13 @@ static int mhi_init_pci_dev(struct mhi_controller *mhi_cntrl)
 		goto error_ioremap;
 	}
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0))
 	ret = pci_enable_msi_range(pci_dev, mhi_cntrl->msi_required,
 				   mhi_cntrl->msi_required);
+#else
+	ret = pci_alloc_irq_vectors(pci_dev, mhi_cntrl->msi_required,
+				    mhi_cntrl->msi_required, PCI_IRQ_MSI);
+#endif
 	if (IS_ERR_VALUE((ulong)ret) || ret < mhi_cntrl->msi_required) {
 		MHI_ERR("Failed to enable MSI, ret:%d\n", ret);
 		goto error_req_msi;

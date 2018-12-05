@@ -287,6 +287,7 @@ static void qrtr_log_rx_msg(struct qrtr_node *node, struct sk_buff *skb)
 	}
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0))
 static bool refcount_dec_and_rwsem_lock(atomic_t *r,
 					struct rw_semaphore *sem)
 {
@@ -301,6 +302,22 @@ static bool refcount_dec_and_rwsem_lock(atomic_t *r,
 
 	return true;
 }
+#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0) */
+static bool refcount_dec_and_rwsem_lock(refcount_t *r,
+					struct rw_semaphore *sem)
+{
+	if (refcount_dec_not_one(r))
+		return false;
+
+	down_write(sem);
+	if (!refcount_dec_and_test(r)) {
+		up_write(sem);
+		return false;
+	}
+
+	return true;
+}
+#endif
 
 static inline int kref_put_rwsem_lock(struct kref *kref,
 				      void (*release)(struct kref *kref),
@@ -1576,6 +1593,7 @@ static const struct nla_policy qrtr_policy[IFA_MAX + 1] = {
 	[IFA_LOCAL] = { .type = NLA_U32 },
 };
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0))
 static int qrtr_addr_doit(struct sk_buff *skb, struct nlmsghdr *nlh)
 {
 	struct nlattr *tb[IFA_MAX + 1];
@@ -1598,6 +1616,31 @@ static int qrtr_addr_doit(struct sk_buff *skb, struct nlmsghdr *nlh)
 	qrtr_local_nid = nla_get_u32(tb[IFA_LOCAL]);
 	return 0;
 }
+#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0) */
+static int qrtr_addr_doit(struct sk_buff *skb, struct nlmsghdr *nlh,
+			  struct netlink_ext_ack *extack)
+{
+	struct nlattr *tb[IFA_MAX + 1];
+	struct ifaddrmsg *ifm;
+	int rc;
+
+	if (!netlink_capable(skb, CAP_NET_ADMIN))
+		return -EPERM;
+
+	ASSERT_RTNL();
+
+	rc = nlmsg_parse(nlh, sizeof(*ifm), tb, IFA_MAX, qrtr_policy, extack);
+	if (rc < 0)
+		return rc;
+
+	ifm = nlmsg_data(nlh);
+	if (!tb[IFA_LOCAL])
+		return -EINVAL;
+
+	qrtr_local_nid = nla_get_u32(tb[IFA_LOCAL]);
+	return 0;
+}
+#endif
 
 static const struct net_proto_family qrtr_family = {
 	.owner	= THIS_MODULE,

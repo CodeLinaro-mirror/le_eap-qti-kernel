@@ -1,0 +1,94 @@
+From 371fbfa8b0599d922ef4ce361179446f2f2977e5 Mon Sep 17 00:00:00 2001
+From: Subash Abhinov Kasiviswanathan <subashab@codeaurora.org>
+Date: Mon, 25 Jan 2016 18:09:54 -0700
+Subject: [PATCH 2/3] net: Add the get current NAPI context API
+
+Commit 69235aa80090 ("net: Remove the get current NAPI context API")
+removed the definition of get_current_napi_context() as rmnet_data
+was no longer using it. However, the rmnet_data change to use its
+NAPI in multiple contexts was prone to race in hotplug scenarios.
+
+Add back get_current_napi_context() and current_napi to the
+softnet_data struct.
+
+CRs-Fixed: 1078373
+Change-Id: I7cf1c5e39a5ccbd7a74a096b11efd179a4d0d034
+Signed-off-by: Subash Abhinov Kasiviswanathan <subashab@codeaurora.org>
+---
+ include/linux/netdevice.h |  2 ++
+ net/core/dev.c            | 18 ++++++++++++++++--
+ 2 files changed, 18 insertions(+), 2 deletions(-)
+
+diff --git a/include/linux/netdevice.h b/include/linux/netdevice.h
+index 2ea7ee1..c7b45c0 100644
+--- a/include/linux/netdevice.h
++++ b/include/linux/netdevice.h
+@@ -2761,6 +2761,7 @@ struct sd_flow_limit {
+  */
+ struct softnet_data {
+ 	struct list_head	poll_list;
++	struct napi_struct	*current_napi;
+ 	struct sk_buff_head	process_queue;
+ 
+ 	/* stats */
+@@ -3272,6 +3273,7 @@ static inline void dev_consume_skb_any(struct sk_buff *skb)
+ gro_result_t napi_gro_frags(struct napi_struct *napi);
+ struct packet_offload *gro_find_receive_by_type(__be16 type);
+ struct packet_offload *gro_find_complete_by_type(__be16 type);
++extern struct napi_struct *get_current_napi_context(void);
+ 
+ static inline void napi_free_frags(struct napi_struct *napi)
+ {
+diff --git a/net/core/dev.c b/net/core/dev.c
+index 6ca771f..b69fd02 100644
+--- a/net/core/dev.c
++++ b/net/core/dev.c
+@@ -5172,8 +5172,7 @@ static int process_backlog(struct napi_struct *napi, int quota)
+ 			rcu_read_unlock();
+ 			input_queue_head_incr(sd);
+ 			if (++work >= quota)
+-				return work;
+-
++				goto state_changed;
+ 		}
+ 
+ 		local_irq_disable();
+@@ -5197,6 +5196,10 @@ static int process_backlog(struct napi_struct *napi, int quota)
+ 		local_irq_enable();
+ 	}
+ 
++state_changed:
++	napi_gro_flush(napi, false);
++	sd->current_napi = NULL;
++
+ 	return work;
+ }
+ 
+@@ -5547,6 +5550,14 @@ void netif_napi_del(struct napi_struct *napi)
+ }
+ EXPORT_SYMBOL(netif_napi_del);
+ 
++struct napi_struct *get_current_napi_context(void)
++{
++	struct softnet_data *sd = this_cpu_ptr(&softnet_data);
++
++	return sd->current_napi;
++}
++EXPORT_SYMBOL(get_current_napi_context);
++
+ static int napi_poll(struct napi_struct *n, struct list_head *repoll)
+ {
+ 	void *have;
+@@ -5566,6 +5577,9 @@ static int napi_poll(struct napi_struct *n, struct list_head *repoll)
+ 	 */
+ 	work = 0;
+ 	if (test_bit(NAPI_STATE_SCHED, &n->state)) {
++		struct softnet_data *sd = this_cpu_ptr(&softnet_data);
++
++		sd->current_napi = n;
+ 		work = n->poll(n, weight);
+ 		trace_napi_poll(n, work, weight);
+ 	}
+-- 
+1.9.1
+

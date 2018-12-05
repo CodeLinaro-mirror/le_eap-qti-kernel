@@ -29,35 +29,54 @@ FILESEXTRAPATHS_append := ":${WORKSPACE}/sources"
 
 SRC_URI += "file://eap-qti-kernel"
 
+LINUX_VERSION ??= "${PV}"
+
 do_unpack_extra () {
     cp -r ${WORKDIR}/eap-qti-kernel/* ${S}/
+
     if [ -e ${S}/arch/arm/boot/dts ]; then
         cp ${WORKDIR}/eap-qti-kernel/devicetree/* ${S}/arch/arm/boot/dts/
     fi
+
     if [ -e ${S}/arch/arm64/boot/dts/freescale ]; then
         cp ${WORKDIR}/eap-qti-kernel/devicetree/* ${S}/arch/arm64/boot/dts/freescale/
     fi
+
     echo "source \"drivers/qti/Kconfig"\" >> ${S}/drivers/Kconfig
     echo "obj-y += qti/" >> ${S}/drivers/Makefile
     echo "header-y += qrtr.h" >> ${S}/include/uapi/linux/Kbuild
     echo "header-y += msm_rmnet.h" >> ${S}/include/uapi/linux/Kbuild
     echo "header-y += rmnet_data.h" >> ${S}/include/uapi/linux/Kbuild
+
     if [ -e ${S}/arch/arm/boot/dts/imx6q-sabrelite.dts ]; then
         echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6q-sabrelite.dts
     fi
+
     if [ -e ${S}/arch/arm/boot/dts/imx6sx-sdb.dts ]; then
         echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6sx-sdb.dts
     fi
+
     if [ -e ${S}/arch/arm64/boot/dts/freescale/fsl-imx8dx.dtsi ]; then
         echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/fsl-imx8dx.dtsi
     fi
-    cd ${S}
-    git apply ${WORKDIR}/eap-qti-kernel/patches/0001-mhi_bus-core-Add-support-for-MHI-host-interface.patch
-    git apply ${WORKDIR}/eap-qti-kernel/patches/0002-net-Add-the-get-current-NAPI-context-API.patch
-    git apply ${WORKDIR}/eap-qti-kernel/patches/0003-msm_rmnet-merge-support-for-RAWIP-msm_rmnet-device.patch
-    git apply ${WORKDIR}/eap-qti-kernel/patches/0004-net-rmnet_data-Add-snapshot-of-rmnet_data-driver.patch
-    git apply ${WORKDIR}/eap-qti-kernel/patches/0005-net-ipv6-Generate-random-IID-for-addresses-on-RAWIP-.patch
-    cd -
+
+    if [ "${@d.getVar('LINUX_VERSION')[0:3]}" = "4.9" ]; then
+        cd ${S}
+        git apply ${WORKDIR}/eap-qti-kernel/patches-4.9/0001-mhi_bus-core-Add-support-for-MHI-host-interface.patch
+        git apply ${WORKDIR}/eap-qti-kernel/patches-4.9/0002-net-Add-the-get-current-NAPI-context-API.patch
+        git apply ${WORKDIR}/eap-qti-kernel/patches-4.9/0003-msm_rmnet-merge-support-for-RAWIP-msm_rmnet-device.patch
+        git apply ${WORKDIR}/eap-qti-kernel/patches-4.9/0004-net-rmnet_data-Add-snapshot-of-rmnet_data-driver.patch
+        git apply ${WORKDIR}/eap-qti-kernel/patches-4.9/0005-net-ipv6-Generate-random-IID-for-addresses-on-RAWIP-.patch
+        cd -
+    elif [ "${@d.getVar('LINUX_VERSION')[0:4]}" = "4.14" ]; then
+        cd ${S}
+        git apply ${WORKDIR}/eap-qti-kernel/patches-4.14/0001-mhi_bus-core-Add-support-for-MHI-host-interface.patch
+        git apply ${WORKDIR}/eap-qti-kernel/patches-4.14/0002-net-Add-the-get-current-NAPI-context-API.patch
+        git apply ${WORKDIR}/eap-qti-kernel/patches-4.14/0003-net-ipv6-Generate-random-IID-for-addresses-on-RAWIP-.patch
+        cd -
+    else
+        bbfatal "Kernel version ${LINUX_VERSION} is not supported"
+    fi
 }
 
 addtask unpack_extra after do_unpack before do_patch

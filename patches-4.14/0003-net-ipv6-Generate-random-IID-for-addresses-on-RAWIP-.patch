@@ -1,0 +1,46 @@
+From 642ca15de68dc9b2b68e51d84e4391619f4ab4aa Mon Sep 17 00:00:00 2001
+From: Gustavo Solaira <gustavos@codeaurora.org>
+Date: Wed, 17 Oct 2018 21:09:20 -0700
+Subject: [PATCH 3/3] net: ipv6: Generate random IID for addresses on RAWIP
+ devices
+
+RAWIP devices such as rmnet do not have a hardware address and
+instead require the kernel to generate a random IID for the
+IPv6 addresses.
+
+CRs-Fixed: 2233026
+Change-Id: Ic46b85f43e4e87cc463d214f8085ffc5584e31f0
+Signed-off-by: Sean Tranchetti <stranche@codeaurora.org>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+Git-commit: 9deb441c113ae9e761e42f78d90736d762ff49a3
+Git-repo: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+Signed-off-by: Subash Abhinov Kasiviswanathan <subashab@codeaurora.org>
+---
+ net/ipv6/addrconf.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/net/ipv6/addrconf.c b/net/ipv6/addrconf.c
+index 6a76e41..60cad1f4 100644
+--- a/net/ipv6/addrconf.c
++++ b/net/ipv6/addrconf.c
+@@ -2214,6 +2214,7 @@ static int ipv6_generate_eui64(u8 *eui, struct net_device *dev)
+ 		return addrconf_ifid_ieee1394(eui, dev);
+ 	case ARPHRD_TUNNEL6:
+ 	case ARPHRD_IP6GRE:
++	case ARPHRD_RAWIP:
+ 		return addrconf_ifid_ip6tnl(eui, dev);
+ 	}
+ 	return -1;
+@@ -3220,7 +3221,8 @@ static void addrconf_dev_config(struct net_device *dev)
+ 	    (dev->type != ARPHRD_IP6GRE) &&
+ 	    (dev->type != ARPHRD_IPGRE) &&
+ 	    (dev->type != ARPHRD_TUNNEL) &&
+-	    (dev->type != ARPHRD_NONE)) {
++	    (dev->type != ARPHRD_NONE) &&
++	    (dev->type != ARPHRD_RAWIP)) {
+ 		/* Alas, we support only Ethernet autoconfiguration. */
+ 		return;
+ 	}
+-- 
+1.9.1
+
