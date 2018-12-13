@@ -584,6 +584,9 @@ static int usb_bridge_bind(struct usb_configuration *c, struct usb_function *f)
 		goto err;
 	}
 
+	func_data->vid = ub_i_data->udev->descriptor.idVendor;
+	func_data->pid = ub_i_data->udev->descriptor.idProduct;
+
 	ub_i_intf = ub_i_data->interface;
 	cur_altset = ub_i_intf->cur_altsetting;
 
@@ -754,6 +757,18 @@ static void usb_bridge_do_unbind(struct usb_function *f)
 	func_data->bind = false;
 	func_data->iface_data = NULL;
 
+	/* Need to check if the function was deactivated
+	 * in the disconnect call on the interface side.
+	 *
+	 * Need to activate this function before unbinding
+	 * as the gadget is deactivated when a function deactivates
+	 * and the gadget would not reactivate until the function
+	 * activates. To avoid the gadget to be deactivated indefinitely,
+	 * activate this function if it is deactivated.
+	 */
+	if (func_data->func_state == UB_FUNC_DEACT)
+		usb_function_activate(f);
+
 	dev_info(dev, "Unbound interface %d\n", func_data->iface_name);
 }
 
@@ -872,7 +887,6 @@ static int usb_bridge_set_inst_name(struct usb_function_instance *fi,
 	if (kstrtou8(name, 10, &func_data->iface_name))
 		return -EINVAL;
 
-	func_data->i_name_allocated = true;
 	return 0;
 }
 

@@ -22,6 +22,11 @@
 #define USB_MAXCONFIG 8
 #define USB_DESC_BUFSIZE 512
 
+enum ub_func_state_e {
+	UB_FUNC_ACT = 0,
+	UB_FUNC_DEACT,
+};
+
 enum ub_req_state_e {
 	UB_REQ_FREE = 0,
 	UB_REQ_URB_SUBMIT,
@@ -76,12 +81,14 @@ struct ub_func {
 	struct ub_func_eps f_i_eps;
 	struct ub_req **ub_reqs;
 	struct ub_iface *iface_data;
+	uint16_t vid;
+	uint16_t pid;
 	uint8_t num_ep;
-	uint8_t i_name_allocated;
 	uint8_t iface_name;
 	uint8_t assoc_desc;
 	uint8_t bind;
 	uint8_t enabled;
+	uint8_t func_state;
 };
 
 struct ub_func_list {

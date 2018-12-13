@@ -91,6 +91,17 @@ struct ub_iface *usb_bridge_interface_get(uint8_t func_id)
 	return NULL;
 }
 
+static bool usb_bridge_check_vid_pid(struct ub_iface *i, struct ub_func *f)
+{
+	struct usb_device *udev = i->udev;
+
+	if ((udev->descriptor.idVendor == f->vid) &&
+	    (udev->descriptor.idProduct == f->pid))
+		return true;
+
+	return false;
+}
+
 static void usb_bridge_func_activate(struct work_struct *data)
 {
 	int i = 0, ret = 0;
@@ -111,6 +122,8 @@ static void usb_bridge_func_activate(struct work_struct *data)
 
 			ret = usb_function_activate(
 				&funcs->func_data[i]->function);
+			if (!ret)
+				funcs->func_data[i]->func_state = UB_FUNC_ACT;
 			funcs->func_data[i] = NULL;
 		}
 	}
@@ -129,17 +142,27 @@ static int usb_bridge_func_add(struct ub_iface *ub_i_data,
 	/* Function is registered, check if function instance exists */
 	spin_lock_irqsave(&ub_func_data->func_lock, flags);
 	list_for_each_entry(func_data, &ub_func_data->func_list, func_hook) {
-		if (func_data->iface_name == interface_num) {
-			if ((func_data->function.bind != NULL) &&
-			    (func_data->iface_data != NULL)) {
-				func_add = true;
-				func_data->iface_data = ub_i_data;
-			}
-			goto add_func;
-		}
-	}
+		if (func_data->iface_name != interface_num)
+			continue;
 
-add_func:
+		if ((func_data->function.bind == NULL) ||
+		    (func_data->iface_data == NULL))
+			break;
+
+		if (usb_bridge_check_vid_pid(ub_i_data, func_data)) {
+			func_add = true;
+			func_data->iface_data = ub_i_data;
+			break;
+		}
+
+		dev_info(&ub_i_data->interface->dev,
+		"Intf %d VID/PID (%04x:%04x) does not match bridged VID/PID (%04x:%04x)",
+		interface_num,
+		ub_i_data->udev->descriptor.idVendor,
+		ub_i_data->udev->descriptor.idProduct,
+		func_data->vid, func_data->pid);
+		break;
+	}
 	spin_unlock_irqrestore(&ub_func_data->func_lock, flags);
 
 	if (func_add) {
@@ -147,12 +170,12 @@ add_func:
 		/* Claim interface */
 		usb_set_intfdata(ub_i_data->interface, ub_i_data);
 		if (ub_i_data->interface->cur_altsetting->string != NULL)
-			dev_info(dev, "Claimed interface %s of %x:%x\n",
+			dev_info(dev, "Claimed interface %s of 0x%04x:0x%04x\n",
 				 ub_i_data->interface->cur_altsetting->string,
 				 ub_i_data->udev->descriptor.idVendor,
 				 ub_i_data->udev->descriptor.idProduct);
 		else
-			dev_info(dev, "Claimed interface %d of %x:%x\n",
+			dev_info(dev, "Claimed interface %d of 0x%04x:0x%04x\n",
 				 interface_num,
 				 ub_i_data->udev->descriptor.idVendor,
 				 ub_i_data->udev->descriptor.idProduct);
@@ -267,6 +290,9 @@ remove_func:
 			dev_dbg(&interface->dev,
 				"Function deactivate status %d\n",
 				ret);
+			if (!ret)
+				func_data->func_state = UB_FUNC_DEACT;
+
 			func_data->function.disable(&func_data->function);
 		}
 	}
