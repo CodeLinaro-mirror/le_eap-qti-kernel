@@ -1,4 +1,4 @@
-/* Copyright (c) 2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -22,6 +22,7 @@
 #include <linux/errno.h>
 #include <linux/of_device.h>
 #include <linux/rtnetlink.h>
+#include <linux/version.h>
 #include <linux/mhi.h>
 
 #define MHI_NETDEV_DRIVER_NAME "mhi_netdev"
@@ -458,6 +459,10 @@ static void mhi_netdev_setup(struct net_device *dev)
 	dev->addr_len = 0;
 	dev->flags &= ~(IFF_BROADCAST | IFF_MULTICAST);
 	dev->watchdog_timeo = WATCHDOG_TIMEOUT;
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0))
+	dev->max_mtu = ETH_MAX_MTU;
+#endif
 }
 
 /* enable mhi_netdev netdev, call only after grabbing mhi_netdev.mutex */
