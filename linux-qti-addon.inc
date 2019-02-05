@@ -42,7 +42,7 @@ do_unpack_extra () {
         cp ${WORKDIR}/eap-qti-kernel/devicetree/* ${S}/arch/arm64/boot/dts/freescale/
     fi
 
-    echo "source \"drivers/qti/Kconfig"\" >> ${S}/drivers/Kconfig
+    echo "source \"drivers/qti/Kconfig\"" >> ${S}/drivers/Kconfig
     echo "obj-y += qti/" >> ${S}/drivers/Makefile
     echo "header-y += qrtr.h" >> ${S}/include/uapi/linux/Kbuild
     echo "header-y += msm_rmnet.h" >> ${S}/include/uapi/linux/Kbuild
