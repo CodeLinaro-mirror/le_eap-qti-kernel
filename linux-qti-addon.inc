@@ -52,8 +52,12 @@ do_unpack_extra () {
         echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6q-sabrelite.dts
     fi
 
-    if [ -e ${S}/arch/arm/boot/dts/imx6sx-sdb.dts ]; then
-        echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6sx-sdb.dts
+    if [ -e ${S}/arch/arm/boot/dts/imx6sx.dtsi ]; then
+        echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6sx.dtsi
+    fi
+
+    if [ -e ${S}/arch/arm/boot/dts/imx6qdl.dtsi ]; then
+        echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6qdl.dtsi
     fi
 
     if [ -e ${S}/arch/arm64/boot/dts/freescale/fsl-imx8dx.dtsi ]; then
