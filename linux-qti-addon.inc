@@ -81,8 +81,6 @@ do_unpack_extra () {
 
 addtask unpack_extra after do_unpack before do_patch
 
-do_patch_extra () {
+do_preconfigure_prepend () {
     cat ${WORKDIR}/eap-qti-kernel/defconfig >> ${WORKDIR}/defconfig
 }
-
-addtask patch_extra after do_patch before do_preconfigure
