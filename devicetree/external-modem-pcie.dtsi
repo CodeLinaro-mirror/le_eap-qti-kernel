@@ -213,7 +213,7 @@
 			reg = <20>;
 			label = "IPCR";
 			mhi,num-elements = <64>;
-			mhi,event-ring = <2>;
+			mhi,event-ring = <1>;
 			mhi,chan-dir = <1>;
 			mhi,data-type = <1>;
 			mhi,doorbell-mode = <2>;
