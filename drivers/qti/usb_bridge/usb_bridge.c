@@ -74,7 +74,7 @@ void usb_bridge_device_out_compl(struct urb *urb)
 
 struct ub_iface *usb_bridge_interface_get(uint8_t func_id)
 {
-	unsigned int flags = 0;
+	unsigned long flags = 0;
 	struct ub_iface *ub_i_data = NULL;
 
 	/* Find interface with same interface id */

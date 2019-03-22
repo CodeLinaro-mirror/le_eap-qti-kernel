@@ -516,7 +516,7 @@ static void usb_bridge_setup(struct work_struct *data)
 {
 	struct ub_func *func_data = NULL;
 	int i = 0;
-	unsigned int flags;
+	unsigned long flags;
 
 	spin_lock_irqsave(&ub_f_setup.wq_lock, flags);
 	for (i = 0; i < MAX_CONFIG_INTERFACES; i++) {
@@ -812,7 +812,7 @@ static int usb_bridge_set_alt(struct usb_function *f, unsigned int intf,
 	struct device *dev = NULL;
 	int error = 0;
 	int i = 0;
-	unsigned int flags;
+	unsigned long flags;
 
 	func_data = container_of(f, struct ub_func, function);
 	dev = &func_data->config->cdev->gadget->dev;
