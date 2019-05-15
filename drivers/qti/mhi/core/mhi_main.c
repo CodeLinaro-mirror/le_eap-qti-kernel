@@ -167,6 +167,9 @@ void mhi_ring_cmd_db(struct mhi_controller *mhi_cntrl, struct mhi_cmd *mhi_cmd)
 
 	db = ring->iommu_base + (ring->wp - ring->base);
 	*ring->ctxt_wp = db;
+	/* update should take the effect immediately */
+	wmb();
+
 	mhi_write_db(mhi_cntrl, ring->db_addr, db);
 }
 
@@ -178,6 +181,9 @@ void mhi_ring_chan_db(struct mhi_controller *mhi_cntrl,
 
 	db = ring->iommu_base + (ring->wp - ring->base);
 	*ring->ctxt_wp = db;
+	/* update should take the effect immediately */
+	wmb();
+
 	mhi_chan->db_cfg.process_db(mhi_cntrl, &mhi_chan->db_cfg, ring->db_addr,
 				    db);
 }
@@ -224,7 +230,7 @@ static void mhi_add_ring_element(struct mhi_controller *mhi_cntrl,
 	if (ring->wp >= (ring->base + ring->len))
 		ring->wp = ring->base;
 	/* smp update */
-	smp_wmb();
+	wmb();
 }
 
 static void mhi_del_ring_element(struct mhi_controller *mhi_cntrl,
@@ -234,7 +240,7 @@ static void mhi_del_ring_element(struct mhi_controller *mhi_cntrl,
 	if (ring->rp >= (ring->base + ring->len))
 		ring->rp = ring->base;
 	/* smp update */
-	smp_wmb();
+	wmb();
 }
 
 static int get_nr_avail_ring_elements(struct mhi_controller *mhi_cntrl,
@@ -284,7 +290,7 @@ static void mhi_recycle_ev_ring_element(struct mhi_controller *mhi_cntrl,
 		ring->rp = ring->base;
 
 	/* visible to other cores */
-	smp_wmb();
+	wmb();
 }
 
 static bool mhi_is_ring_full(struct mhi_controller *mhi_cntrl,

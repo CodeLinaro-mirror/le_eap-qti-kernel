@@ -79,7 +79,7 @@ static int __mhi_download_rddm_in_panic(struct mhi_controller *mhi_cntrl)
 	 */
 	mhi_cntrl->pm_state = MHI_PM_LD_ERR_FATAL_DETECT;
 	/* update should take the effect immediately */
-	smp_wmb();
+	wmb();
 
 	/* setup the RX vector table */
 	mhi_rddm_prepare(mhi_cntrl, rddm_image);

@@ -668,7 +668,7 @@ int mhi_init_chan_ctxt(struct mhi_controller *mhi_cntrl,
 	mhi_chan->db_cfg.db_mode = 1;
 
 	/* update to all cores */
-	smp_wmb();
+	wmb();
 
 	return 0;
 }
