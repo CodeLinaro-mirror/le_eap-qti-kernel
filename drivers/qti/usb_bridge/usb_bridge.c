@@ -12,6 +12,7 @@
 
 #include <linux/workqueue.h>
 #include <linux/pm_runtime.h>
+#include <linux/seq_file.h>
 #include <linux/usb_bridge.h>
 
 #define USB_QTI_VENDOR_ID 0x05c6
@@ -19,6 +20,19 @@
 struct ub_func_inst_wq {
 	struct work_struct work;
 	struct ub_func *func_data[MAX_CONFIG_INTERFACES];
+};
+
+struct ub_debug {
+	uint8_t intf;
+	uint8_t state;
+	unsigned long ub_to_host;
+	unsigned long host_to_ub;
+	unsigned long ub_to_device;
+	unsigned long device_to_ub;
+	unsigned long ub_to_host_err;
+	unsigned long host_to_ub_err;
+	unsigned long ub_to_device_err;
+	unsigned long device_to_ub_err;
 };
 
 static struct ub_intf_list ub_intf_data;
@@ -30,6 +44,11 @@ void usb_bridge_device_in_compl(struct urb *urb)
 {
 	struct ub_req *ub_req = (struct ub_req *)urb->context;
 	int ret;
+
+	if (!urb->status)
+		ub_req->device_to_ub++;
+	else
+		ub_req->device_to_ub_err++;
 
 	if (!urb->status && (ub_req->state != UB_REQ_DO_NOT_SUBMIT)) {
 		if (!ub_req)
@@ -58,6 +77,11 @@ void usb_bridge_device_out_compl(struct urb *urb)
 {
 	struct ub_req *ub_req = (struct ub_req *)urb->context;
 	int ret;
+
+	if (!urb->status)
+		ub_req->ub_to_device++;
+	else
+		ub_req->ub_to_device_err++;
 
 	if (!urb->status && (ub_req->state != UB_REQ_DO_NOT_SUBMIT)) {
 		/* Data was successfully sent, notify host */
@@ -342,9 +366,105 @@ void usb_bridge_interface_release(struct usb_interface *interface)
 	usb_driver_release_interface(&usb_bridge_intf_driver, interface);
 }
 
+static int usb_bridge_status(struct seq_file *s, void *unused)
+{
+	struct ub_func *func = NULL;
+	struct ub_debug dbg[USB_MAXCONFIG] = {0};
+	int fcount = 0;
+	int nume = 0;
+	int num_funcs = 0;
+	unsigned long flags;
+
+	/* Read counters */
+	spin_lock_irqsave(&ub_func_data->func_lock, flags);
+	list_for_each_entry(func, &ub_func_data->func_list, func_hook) {
+		dbg[fcount].intf = func->iface_name;
+		dbg[fcount].state = func->enabled;
+		if (dbg[fcount].state) {
+			for (nume = 0; nume < func->num_ep; nume++) {
+				dbg[fcount].host_to_ub +=
+					func->ub_reqs[nume]->host_to_ub;
+				dbg[fcount].ub_to_device +=
+					func->ub_reqs[nume]->ub_to_device;
+				dbg[fcount].device_to_ub +=
+					func->ub_reqs[nume]->device_to_ub;
+				dbg[fcount].ub_to_host +=
+					func->ub_reqs[nume]->ub_to_host;
+				dbg[fcount].host_to_ub_err +=
+					func->ub_reqs[nume]->host_to_ub_err;
+				dbg[fcount].ub_to_device_err +=
+					func->ub_reqs[nume]->ub_to_device_err;
+				dbg[fcount].device_to_ub_err +=
+					func->ub_reqs[nume]->device_to_ub_err;
+				dbg[fcount].ub_to_host_err +=
+					func->ub_reqs[nume]->ub_to_host_err;
+			}
+		}
+		fcount++;
+	}
+	spin_unlock_irqrestore(&ub_func_data->func_lock, flags);
+
+	num_funcs = fcount;
+
+	/* Print header */
+	seq_printf(s, "%s\t%s\t%s\t%s\t%s\t%s\n",
+			"interface",
+			"status",
+			"host->bridge",
+			"bridge->device",
+			"device->bridge",
+			"bridge->host");
+
+	/* Print counters */
+	for (fcount = 0; fcount < num_funcs; fcount++) {
+		seq_printf(s, "%ld\t\t\t%s\t",
+				dbg[fcount].intf,
+				dbg[fcount].state ? "Bridged" : "Not Bridged");
+		seq_printf(s, "%ld\t\t%ld\t\t",
+				dbg[fcount].host_to_ub,
+				dbg[fcount].ub_to_device);
+		seq_printf(s, "%ld\t\t%ld",
+				dbg[fcount].device_to_ub,
+				dbg[fcount].ub_to_host);
+	}
+
+	/* Print error counters */
+	seq_printf(s, "\n\nErrors:\n");
+	for (fcount = 0; fcount < num_funcs; fcount++) {
+		seq_printf(s, "%s\t%s\t%s\t%s\n",
+				"host->bridge",
+				"bridge->device",
+				"device->bridge",
+				"bridge->host");
+		seq_printf(s, "%ld\t\t%ld\t\t",
+				dbg[fcount].host_to_ub_err,
+				dbg[fcount].ub_to_device_err);
+		seq_printf(s, "%ld\t\t%ld",
+				dbg[fcount].device_to_ub_err,
+				dbg[fcount].ub_to_host_err);
+	}
+	seq_printf(s, "\n");
+
+	return 0;
+}
+
+static int usb_bridge_status_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, usb_bridge_status, inode->i_private);
+}
+
+const struct file_operations ub_file_ops = {
+	.open = usb_bridge_status_open,
+	.read =  seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
 static int __init usb_bridge_init(void)
 {
 	int ret = 0;
+	struct dentry *ub_dentry = NULL;
+	struct dentry *ub_dentry_root = NULL;
 
 	/* Initialize interface list */
 	INIT_LIST_HEAD(&ub_intf_data.intf_list);
@@ -368,6 +488,22 @@ static int __init usb_bridge_init(void)
 
 	ub_intf_data.func_register = true;
 
+	/* Setup debug interface */
+	ub_dentry_root = debugfs_create_dir("usb_bridge", NULL);
+	if (ub_dentry_root && !IS_ERR(ub_dentry_root)) {
+		ub_dentry = debugfs_create_file("status",
+						S_IRUGO | S_IWUSR,
+						ub_dentry_root,
+						&ub_intf_data,
+						&ub_file_ops);
+		if (!ub_dentry)
+			debugfs_remove_recursive(ub_dentry_root);
+	}
+
+	if (!ub_dentry || !ub_dentry_root)
+		pr_err("Unable to create debug node\n");
+
+	ub_intf_data.dentry_root = ub_dentry_root;
 	return ret;
 }
 
@@ -377,6 +513,8 @@ static void __exit usb_bridge_exit(void)
 
 	if (ub_intf_data.func_register)
 		usb_bridge_func_unreg();
+
+	debugfs_remove_recursive(ub_intf_data.dentry_root);
 }
 
 module_init(usb_bridge_init);

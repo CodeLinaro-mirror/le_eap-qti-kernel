@@ -18,6 +18,7 @@
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
 #include <linux/usb.h>
+#include <linux/debugfs.h>
 
 #define USB_MAXCONFIG 8
 #define USB_DESC_BUFSIZE 512
@@ -40,6 +41,14 @@ struct ub_req {
 	struct usb_ep *ub_f_ep;
 	enum ub_req_state_e state;
 	int ep_dir;
+	unsigned long host_to_ub;
+	unsigned long ub_to_device;
+	unsigned long device_to_ub;
+	unsigned long ub_to_host;
+	unsigned long host_to_ub_err;
+	unsigned long ub_to_device_err;
+	unsigned long device_to_ub_err;
+	unsigned long ub_to_host_err;
 };
 
 struct ub_ep_count {
@@ -100,6 +109,7 @@ struct ub_intf_list {
 	spinlock_t intf_lock;
 	struct list_head intf_list;	/* List of interfaces */
 	bool func_register;
+	struct dentry *dentry_root;
 };
 
 /*
