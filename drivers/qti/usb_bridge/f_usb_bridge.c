@@ -46,7 +46,12 @@ static void usb_bridge_host_in_compl(struct usb_ep *ep, struct usb_request *req)
 	struct ub_req *ub_req = req->context;
 	int ret;
 
-	/* Send completion to Device */
+	if (req->status && req->status != -ESHUTDOWN)
+		ub_req->ub_to_host_err++;
+	else if (!req->status)
+		ub_req->ub_to_host++;
+
+	/* Send completion event to Device */
 	if (!req->status && (ub_req->state != UB_REQ_DO_NOT_SUBMIT)) {
 		ret = usb_submit_urb(ub_req->urb, GFP_ATOMIC);
 		if (ret)
@@ -61,6 +66,11 @@ static void usb_bridge_host_out_compl(struct usb_ep *ep,
 {
 	struct ub_req *ub_req = req->context;
 	int ret;
+
+	if (req->status && req->status != -ESHUTDOWN)
+		ub_req->host_to_ub_err++;
+	else if (!req->status)
+		ub_req->host_to_ub++;
 
 	/* Send data to Device */
 	if (!req->status && (ub_req->state != UB_REQ_DO_NOT_SUBMIT)) {
