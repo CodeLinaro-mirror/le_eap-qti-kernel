@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, 2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, 2018-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -270,7 +270,7 @@ static int rmnet_usb_debugfs_init(struct usbnet *unet)
 		return -ENODEV;
 
 	rmnet_usb_dentry = debugfs_create_file("status",
-					       S_IRUGO | S_IWUSR,
+					       0644,
 					       rmnet_usb_dbg_root,
 					       unet,
 					       &rmnet_usb_fops);
@@ -406,7 +406,7 @@ static void rmnet_usb_disconnect(struct usb_interface *intf)
 	usbnet_disconnect(intf);
 }
 
-static struct driver_info rmnet_usb_info = {
+static const struct driver_info rmnet_usb_info = {
 	.description = "RmNET device",
 	.flags = FLAG_SEND_ZLP,
 	.bind = rmnet_usb_bind,
@@ -418,11 +418,15 @@ static struct driver_info rmnet_usb_info = {
 static const struct usb_device_id rmnet_usb_ids[] = {
 	{
 		USB_DEVICE_INTERFACE_NUMBER(RMNET_VENDOR_ID, 0x90EF, 2),
-		.driver_info = (unsigned long) &rmnet_usb_info,
+		.driver_info = (unsigned long)&rmnet_usb_info,
 	},
 	{
 		USB_DEVICE_INTERFACE_NUMBER(RMNET_VENDOR_ID, 0x90F0, 2),
-		.driver_info = (unsigned long) &rmnet_usb_info,
+		.driver_info = (unsigned long)&rmnet_usb_info,
+	},
+	{
+		USB_DEVICE_INTERFACE_NUMBER(RMNET_VENDOR_ID, 0x90F3, 1),
+		.driver_info = (unsigned long)&rmnet_usb_info,
 	},
 	{ } /* Terminating entry */
 };
