@@ -1,4 +1,4 @@
-/* Copyright (c) 2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -32,6 +32,7 @@ const char * const mhi_ee_str[MHI_EE_MAX] = {
 	[MHI_EE_PTHRU] = "PASS THRU",
 	[MHI_EE_EDL] = "EDL",
 	[MHI_EE_DISABLE_TRANSITION] = "DISABLE",
+	[MHI_EE_NOT_SUPPORTED] = "NOT SUPPORTED",
 };
 
 const char * const mhi_state_tran_str[MHI_ST_TRANSITION_MAX] = {
@@ -48,6 +49,7 @@ const char * const mhi_state_str[MHI_STATE_MAX] = {
 	[MHI_STATE_M1] = "M1",
 	[MHI_STATE_M2] = "M2",
 	[MHI_STATE_M3] = "M3",
+	[MHI_STATE_M3_FAST] = "M3_FAST",
 	[MHI_STATE_BHI] = "BHI",
 	[MHI_STATE_SYS_ERR] = "SYS_ERR",
 };
@@ -77,6 +79,95 @@ const char *to_mhi_pm_state_str(enum MHI_PM_STATE state)
 		return "Invalid State";
 
 	return mhi_pm_state_str[index];
+}
+
+static ssize_t bus_vote_show(struct device *dev,
+			     struct device_attribute *attr,
+			     char *buf)
+{
+	struct mhi_device *mhi_dev = to_mhi_device(dev);
+
+	return snprintf(buf, PAGE_SIZE, "%d\n",
+			atomic_read(&mhi_dev->bus_vote));
+}
+
+static ssize_t bus_vote_store(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *buf,
+			      size_t count)
+{
+	struct mhi_device *mhi_dev = to_mhi_device(dev);
+	int ret = -EINVAL;
+
+	if (sysfs_streq(buf, "get")) {
+		ret = mhi_device_get_sync(mhi_dev, MHI_VOTE_BUS);
+	} else if (sysfs_streq(buf, "put")) {
+		mhi_device_put(mhi_dev, MHI_VOTE_BUS);
+		ret = 0;
+	}
+
+	return ret ? ret : count;
+}
+static DEVICE_ATTR_RW(bus_vote);
+
+static ssize_t device_vote_show(struct device *dev,
+				struct device_attribute *attr,
+				char *buf)
+{
+	struct mhi_device *mhi_dev = to_mhi_device(dev);
+
+	return snprintf(buf, PAGE_SIZE, "%d\n",
+			atomic_read(&mhi_dev->dev_vote));
+}
+
+static ssize_t device_vote_store(struct device *dev,
+				 struct device_attribute *attr,
+				 const char *buf,
+				 size_t count)
+{
+	struct mhi_device *mhi_dev = to_mhi_device(dev);
+	int ret = -EINVAL;
+
+	if (sysfs_streq(buf, "get")) {
+		ret = mhi_device_get_sync(mhi_dev, MHI_VOTE_DEVICE);
+	} else if (sysfs_streq(buf, "put")) {
+		mhi_device_put(mhi_dev, MHI_VOTE_DEVICE);
+		ret = 0;
+	}
+
+	return ret ? ret : count;
+}
+static DEVICE_ATTR_RW(device_vote);
+
+static struct attribute *mhi_vote_attrs[] = {
+	&dev_attr_bus_vote.attr,
+	&dev_attr_device_vote.attr,
+	NULL,
+};
+
+static const struct attribute_group mhi_vote_group = {
+	.attrs = mhi_vote_attrs,
+};
+
+int mhi_create_vote_sysfs(struct mhi_controller *mhi_cntrl)
+{
+	return sysfs_create_group(&mhi_cntrl->mhi_dev->dev.kobj,
+				  &mhi_vote_group);
+}
+
+void mhi_destroy_vote_sysfs(struct mhi_controller *mhi_cntrl)
+{
+	struct mhi_device *mhi_dev = mhi_cntrl->mhi_dev;
+
+	sysfs_remove_group(&mhi_dev->dev.kobj, &mhi_vote_group);
+
+	/* relinquish any pending votes for device */
+	while (atomic_read(&mhi_dev->dev_vote))
+		mhi_device_put(mhi_dev, MHI_VOTE_DEVICE);
+
+	/* remove pending votes for the bus */
+	while (atomic_read(&mhi_dev->bus_vote))
+		mhi_device_put(mhi_dev, MHI_VOTE_BUS);
 }
 
 /* MHI protocol require transfer ring to be aligned to ring length */
@@ -118,7 +209,8 @@ int mhi_init_irq_setup(struct mhi_controller *mhi_cntrl)
 
 	/* for BHI INTVEC msi */
 	ret = request_threaded_irq(mhi_cntrl->irq[0], mhi_intvec_handlr,
-				   mhi_intvec_threaded_handlr, IRQF_ONESHOT,
+				   mhi_intvec_threaded_handlr,
+				   IRQF_ONESHOT | IRQF_NO_SUSPEND,
 				   "mhi", mhi_cntrl);
 	if (ret)
 		return ret;
@@ -128,8 +220,8 @@ int mhi_init_irq_setup(struct mhi_controller *mhi_cntrl)
 			continue;
 
 		ret = request_irq(mhi_cntrl->irq[mhi_event->msi],
-				  mhi_msi_handlr, IRQF_SHARED, "mhi",
-				  mhi_event);
+				  mhi_msi_handlr, IRQF_SHARED | IRQF_NO_SUSPEND,
+				  "mhi", mhi_event);
 		if (ret) {
 			MHI_ERR("Error requesting irq:%d for ev:%d\n",
 				mhi_cntrl->irq[mhi_event->msi], i);
@@ -278,6 +370,7 @@ int mhi_init_dev_ctxt(struct mhi_controller *mhi_cntrl)
 
 	atomic_set(&mhi_cntrl->dev_wake, 0);
 	atomic_set(&mhi_cntrl->alloc_size, 0);
+	atomic_set(&mhi_cntrl->pending_pkts, 0);
 
 	mhi_ctxt = kzalloc(sizeof(*mhi_ctxt), GFP_KERNEL);
 	if (!mhi_ctxt)
@@ -300,7 +393,7 @@ int mhi_init_dev_ctxt(struct mhi_controller *mhi_cntrl)
 		chan_ctxt->chstate = MHI_CH_STATE_DISABLED;
 		chan_ctxt->brstmode = mhi_chan->db_cfg.brstmode;
 		chan_ctxt->pollcfg = mhi_chan->db_cfg.pollcfg;
-		chan_ctxt->chtype = mhi_chan->dir;
+		chan_ctxt->chtype = mhi_chan->type;
 		chan_ctxt->erindex = mhi_chan->er_index;
 
 		mhi_chan->ch_state = MHI_CH_STATE_DISABLED;
@@ -411,72 +504,114 @@ error_alloc_chan_ctxt:
 	return ret;
 }
 
+static int mhi_get_tsync_er_cfg(struct mhi_controller *mhi_cntrl)
+{
+	int i;
+	struct mhi_event *mhi_event = mhi_cntrl->mhi_event;
+
+	/* find event ring with timesync support */
+	for (i = 0; i < mhi_cntrl->total_ev_rings; i++, mhi_event++)
+		if (mhi_event->data_type == MHI_ER_TSYNC_ELEMENT_TYPE)
+			return mhi_event->er_index;
+
+	return -ENOENT;
+}
+
 int mhi_init_timesync(struct mhi_controller *mhi_cntrl)
 {
-	struct mhi_timesync *mhi_tsync = mhi_cntrl->mhi_tsync;
+	struct mhi_timesync *mhi_tsync;
 	u32 time_offset, db_offset;
 	int ret;
 
-	reinit_completion(&mhi_tsync->completion);
 	read_lock_bh(&mhi_cntrl->pm_lock);
-	if (MHI_PM_IN_ERROR_STATE(mhi_cntrl->pm_state)) {
-		MHI_ERR("MHI host is not in active state\n");
-		read_unlock_bh(&mhi_cntrl->pm_lock);
-		return -EIO;
-	}
 
-	mhi_cntrl->wake_get(mhi_cntrl, false);
-	read_unlock_bh(&mhi_cntrl->pm_lock);
-	mhi_cntrl->runtime_get(mhi_cntrl, mhi_cntrl->priv_data);
-	mhi_cntrl->runtime_put(mhi_cntrl, mhi_cntrl->priv_data);
-
-	ret = mhi_send_cmd(mhi_cntrl, NULL, MHI_CMD_TIMSYNC_CFG);
-	if (ret) {
-		MHI_ERR("Failed to send time sync cfg cmd\n");
-		goto error_send_cmd;
-	}
-
-	ret = wait_for_completion_timeout(&mhi_tsync->completion,
-				msecs_to_jiffies(mhi_cntrl->timeout_ms));
-
-	if (!ret || mhi_tsync->ccs != MHI_EV_CC_SUCCESS) {
-		MHI_ERR("Failed to receive cmd completion for time_sync_cfg\n");
+	if (!MHI_REG_ACCESS_VALID(mhi_cntrl->pm_state)) {
 		ret = -EIO;
-		goto error_send_cmd;
+		goto exit_timesync;
 	}
-
-	read_lock_bh(&mhi_cntrl->pm_lock);
-	mhi_cntrl->wake_put(mhi_cntrl, false);
-
-	ret = -EIO;
-
-	if (!MHI_REG_ACCESS_VALID(mhi_cntrl->pm_state))
-		goto error_sync_cap;
 
 	ret = mhi_get_capability_offset(mhi_cntrl, TIMESYNC_CAP_ID,
 					&time_offset);
 	if (ret) {
-		MHI_ERR("could not find timesync capability\n");
-		goto error_sync_cap;
+		MHI_LOG("No timesync capability found\n");
+		goto exit_timesync;
 	}
 
-	ret = mhi_read_reg(mhi_cntrl, mhi_cntrl->regs,
-			   time_offset + TIMESYNC_DB_OFFSET, &db_offset);
-	if (ret)
-		goto error_sync_cap;
-
-	MHI_LOG("TIMESYNC_DB OFFS:0x%x\n", db_offset);
-
-	mhi_tsync->db = mhi_cntrl->regs + db_offset;
-
-error_sync_cap:
 	read_unlock_bh(&mhi_cntrl->pm_lock);
 
-	return ret;
+	if (!mhi_cntrl->time_get || !mhi_cntrl->lpm_disable ||
+	     !mhi_cntrl->lpm_enable)
+		return -EINVAL;
 
-error_send_cmd:
+	/* register method supported */
+	mhi_tsync = kzalloc(sizeof(*mhi_tsync), GFP_KERNEL);
+	if (!mhi_tsync)
+		return -ENOMEM;
+
+	spin_lock_init(&mhi_tsync->lock);
+	mutex_init(&mhi_tsync->lpm_mutex);
+	INIT_LIST_HEAD(&mhi_tsync->head);
+	init_completion(&mhi_tsync->completion);
+
+	/* save time_offset for obtaining time */
+	MHI_LOG("TIME OFFS:0x%x\n", time_offset);
+	mhi_tsync->time_reg = mhi_cntrl->regs + time_offset
+			      + TIMESYNC_TIME_LOW_OFFSET;
+
+	mhi_cntrl->mhi_tsync = mhi_tsync;
+
+	ret = mhi_create_timesync_sysfs(mhi_cntrl);
+	if (unlikely(ret)) {
+		/* kernel method still work */
+		MHI_ERR("Failed to create timesync sysfs nodes\n");
+	}
+
 	read_lock_bh(&mhi_cntrl->pm_lock);
-	mhi_cntrl->wake_put(mhi_cntrl, false);
+
+	if (!MHI_REG_ACCESS_VALID(mhi_cntrl->pm_state)) {
+		ret = -EIO;
+		goto exit_timesync;
+	}
+
+	/* get DB offset if supported, else return */
+	ret = mhi_read_reg(mhi_cntrl, mhi_cntrl->regs,
+			   time_offset + TIMESYNC_DB_OFFSET, &db_offset);
+	if (ret || !db_offset) {
+		ret = 0;
+		goto exit_timesync;
+	}
+
+	MHI_LOG("TIMESYNC_DB OFFS:0x%x\n", db_offset);
+	mhi_tsync->db = mhi_cntrl->regs + db_offset;
+
+	read_unlock_bh(&mhi_cntrl->pm_lock);
+
+	/* get time-sync event ring configuration */
+	ret = mhi_get_tsync_er_cfg(mhi_cntrl);
+	if (ret < 0) {
+		MHI_LOG("Could not find timesync event ring\n");
+		return ret;
+	}
+
+	mhi_tsync->er_index = ret;
+
+	ret = mhi_send_cmd(mhi_cntrl, NULL, MHI_CMD_TIMSYNC_CFG);
+	if (ret) {
+		MHI_ERR("Failed to send time sync cfg cmd\n");
+		return ret;
+	}
+
+	ret = wait_for_completion_timeout(&mhi_tsync->completion,
+			msecs_to_jiffies(mhi_cntrl->timeout_ms));
+
+	if (!ret || mhi_tsync->ccs != MHI_EV_CC_SUCCESS) {
+		MHI_ERR("Failed to get time cfg cmd completion\n");
+		return -EIO;
+	}
+
+	return 0;
+
+exit_timesync:
 	read_unlock_bh(&mhi_cntrl->pm_lock);
 
 	return ret;
@@ -624,7 +759,7 @@ void mhi_deinit_chan_ctxt(struct mhi_controller *mhi_cntrl,
 
 	mhi_free_coherent(mhi_cntrl, tre_ring->alloc_size,
 			  tre_ring->pre_aligned, tre_ring->dma_handle);
-	kfree(buf_ring->base);
+	vfree(buf_ring->base);
 
 	buf_ring->base = tre_ring->base = NULL;
 	chan_ctxt->rbase = 0;
@@ -649,7 +784,7 @@ int mhi_init_chan_ctxt(struct mhi_controller *mhi_cntrl,
 
 	buf_ring->el_size = sizeof(struct mhi_buf_info);
 	buf_ring->len = buf_ring->el_size * buf_ring->elements;
-	buf_ring->base = kzalloc(buf_ring->len, GFP_KERNEL);
+	buf_ring->base = vzalloc(buf_ring->len);
 
 	if (!buf_ring->base) {
 		mhi_free_coherent(mhi_cntrl, tre_ring->alloc_size,
@@ -739,6 +874,10 @@ static int of_parse_ev_cfg(struct mhi_controller *mhi_cntrl,
 	int i, ret, num = 0;
 	struct mhi_event *mhi_event;
 	struct device_node *child;
+
+	of_node = of_find_node_by_name(of_node, "mhi_events");
+	if (!of_node)
+		return -EINVAL;
 
 	for_each_available_child_of_node(of_node, child) {
 		if (!strcmp(child->name, "mhi_event"))
@@ -855,8 +994,12 @@ static int of_parse_ch_cfg(struct mhi_controller *mhi_cntrl,
 	if (ret)
 		return ret;
 
-	mhi_cntrl->mhi_chan = kcalloc(mhi_cntrl->max_chan,
-				      sizeof(*mhi_cntrl->mhi_chan), GFP_KERNEL);
+	of_node = of_find_node_by_name(of_node, "mhi_channels");
+	if (!of_node)
+		return -EINVAL;
+
+	mhi_cntrl->mhi_chan = vzalloc(mhi_cntrl->max_chan *
+				      sizeof(*mhi_cntrl->mhi_chan));
 	if (!mhi_cntrl->mhi_chan)
 		return -ENOMEM;
 
@@ -883,11 +1026,22 @@ static int of_parse_ch_cfg(struct mhi_controller *mhi_cntrl,
 		mhi_chan->chan = chan;
 
 		ret = of_property_read_u32(child, "mhi,num-elements",
-					   (u32 *)&mhi_chan->buf_ring.elements);
-		if (!ret && !mhi_chan->buf_ring.elements)
+					   (u32 *)&mhi_chan->tre_ring.elements);
+		if (!ret && !mhi_chan->tre_ring.elements)
 			goto error_chan_cfg;
 
-		mhi_chan->tre_ring.elements = mhi_chan->buf_ring.elements;
+		/*
+		 * For some channels, local ring len should be bigger than
+		 * transfer ring len due to internal logical channels in device.
+		 * So host can queue much more buffers than transfer ring len.
+		 * Example, RSC channels should have a larger local channel
+		 * than transfer ring length.
+		 */
+		ret = of_property_read_u32(child, "mhi,local-elements",
+					   (u32 *)&mhi_chan->buf_ring.elements);
+		if (ret)
+			mhi_chan->buf_ring.elements =
+				mhi_chan->tre_ring.elements;
 
 		ret = of_property_read_u32(child, "mhi,event-ring",
 					   &mhi_chan->er_index);
@@ -898,6 +1052,15 @@ static int of_parse_ch_cfg(struct mhi_controller *mhi_cntrl,
 					   &mhi_chan->dir);
 		if (ret)
 			goto error_chan_cfg;
+
+		/*
+		 * For most channels, chtype is identical to channel directions,
+		 * if not defined, assign ch direction to chtype
+		 */
+		ret = of_property_read_u32(child, "mhi,chan-type",
+					   &mhi_chan->type);
+		if (ret)
+			mhi_chan->type = (enum mhi_ch_type)mhi_chan->dir;
 
 		ret = of_property_read_u32(child, "mhi,ee", &mhi_chan->ee_mask);
 		if (ret)
@@ -926,6 +1089,10 @@ static int of_parse_ch_cfg(struct mhi_controller *mhi_cntrl,
 		case MHI_XFER_NOP:
 			mhi_chan->queue_xfer = mhi_queue_nop;
 			break;
+		case MHI_XFER_DMA:
+		case MHI_XFER_RSC_DMA:
+			mhi_chan->queue_xfer = mhi_queue_dma;
+			break;
 		default:
 			goto error_chan_cfg;
 		}
@@ -940,6 +1107,8 @@ static int of_parse_ch_cfg(struct mhi_controller *mhi_cntrl,
 							    "mhi,auto-queue");
 		mhi_chan->auto_start = of_property_read_bool(child,
 							     "mhi,auto-start");
+		mhi_chan->wake_capable = of_property_read_bool(child,
+							"mhi,wake-capable");
 
 		if (mhi_chan->pre_alloc &&
 		    (mhi_chan->dir != DMA_FROM_DEVICE ||
@@ -977,7 +1146,7 @@ static int of_parse_ch_cfg(struct mhi_controller *mhi_cntrl,
 	return 0;
 
 error_chan_cfg:
-	kfree(mhi_cntrl->mhi_chan);
+	vfree(mhi_cntrl->mhi_chan);
 
 	return -EINVAL;
 }
@@ -986,7 +1155,9 @@ static int of_parse_dt(struct mhi_controller *mhi_cntrl,
 		       struct device_node *of_node)
 {
 	int ret;
-	struct mhi_timesync *mhi_tsync;
+	enum mhi_ee i;
+	u32 *ee;
+	u32 bhie_offset;
 
 	/* parse MHI channel configuration */
 	ret = of_parse_ch_cfg(mhi_cntrl, of_node);
@@ -1003,39 +1174,35 @@ static int of_parse_dt(struct mhi_controller *mhi_cntrl,
 	if (ret)
 		mhi_cntrl->timeout_ms = MHI_TIMEOUT_MS;
 
-	mhi_cntrl->time_sync = of_property_read_bool(of_node, "mhi,time-sync");
-
-	if (mhi_cntrl->time_sync) {
-		mhi_tsync = kzalloc(sizeof(*mhi_tsync), GFP_KERNEL);
-		if (!mhi_tsync) {
-			ret = -ENOMEM;
-			goto error_time_sync;
-		}
-
-		ret = of_property_read_u32(of_node, "mhi,tsync-er",
-					   &mhi_tsync->er_index);
-		if (ret)
-			goto error_time_sync;
-
-		if (mhi_tsync->er_index >= mhi_cntrl->total_ev_rings) {
-			ret = -EINVAL;
-			goto error_time_sync;
-		}
-
-		mhi_cntrl->mhi_tsync = mhi_tsync;
-	}
-
 	mhi_cntrl->bounce_buf = of_property_read_bool(of_node, "mhi,use-bb");
 	ret = of_property_read_u32(of_node, "mhi,buffer-len",
 				   (u32 *)&mhi_cntrl->buffer_len);
 	if (ret)
 		mhi_cntrl->buffer_len = MHI_MAX_MTU;
 
-	return 0;
+	/* by default host allowed to ring DB both M0 and M2 state */
+	mhi_cntrl->db_access = MHI_PM_M0 | MHI_PM_M2;
+	if (of_property_read_bool(of_node, "mhi,m2-no-db-access"))
+		mhi_cntrl->db_access &= ~MHI_PM_M2;
 
-error_time_sync:
-	kfree(mhi_tsync);
-	kfree(mhi_cntrl->mhi_event);
+	/* parse the device ee table */
+	for (i = MHI_EE_PBL, ee = mhi_cntrl->ee_table; i < MHI_EE_MAX;
+	     i++, ee++) {
+		/* setup the default ee before checking for override */
+		*ee = i;
+		ret = of_property_match_string(of_node, "mhi,ee-names",
+					       mhi_ee_str[i]);
+		if (ret < 0)
+			continue;
+
+		of_property_read_u32_index(of_node, "mhi,ee", ret, ee);
+	}
+
+	ret = of_property_read_u32(of_node, "mhi,bhie-offset", &bhie_offset);
+	if (!ret)
+		mhi_cntrl->bhie = mhi_cntrl->regs + bhie_offset;
+
+	return 0;
 
 error_ev_cfg:
 	kfree(mhi_cntrl->mhi_chan);
@@ -1051,6 +1218,7 @@ int of_register_mhi_controller(struct mhi_controller *mhi_cntrl)
 	struct mhi_chan *mhi_chan;
 	struct mhi_cmd *mhi_cmd;
 	struct mhi_device *mhi_dev;
+	u32 soc_info;
 
 	if (!mhi_cntrl->of_node)
 		return -EINVAL;
@@ -1063,11 +1231,6 @@ int of_register_mhi_controller(struct mhi_controller *mhi_cntrl)
 
 	ret = of_parse_dt(mhi_cntrl, mhi_cntrl->of_node);
 	if (ret)
-		return -EINVAL;
-
-	if (mhi_cntrl->time_sync &&
-	    (!mhi_cntrl->time_get || !mhi_cntrl->lpm_disable ||
-	     !mhi_cntrl->lpm_enable))
 		return -EINVAL;
 
 	mhi_cntrl->mhi_cmd = kcalloc(NR_OF_CMD_RINGS,
@@ -1113,20 +1276,33 @@ int of_register_mhi_controller(struct mhi_controller *mhi_cntrl)
 		rwlock_init(&mhi_chan->lock);
 	}
 
-	if (mhi_cntrl->mhi_tsync) {
-		struct mhi_timesync *mhi_tsync = mhi_cntrl->mhi_tsync;
-
-		spin_lock_init(&mhi_tsync->lock);
-		INIT_LIST_HEAD(&mhi_tsync->head);
-		init_completion(&mhi_tsync->completion);
-	}
-
 	if (mhi_cntrl->bounce_buf) {
 		mhi_cntrl->map_single = mhi_map_single_use_bb;
 		mhi_cntrl->unmap_single = mhi_unmap_single_use_bb;
 	} else {
 		mhi_cntrl->map_single = mhi_map_single_no_bb;
 		mhi_cntrl->unmap_single = mhi_unmap_single_no_bb;
+	}
+
+	/* read the device info if possible */
+	if (mhi_cntrl->regs) {
+		ret = mhi_read_reg(mhi_cntrl, mhi_cntrl->regs,
+				   SOC_HW_VERSION_OFFS, &soc_info);
+		if (ret)
+			goto error_alloc_dev;
+
+		mhi_cntrl->family_number =
+			(soc_info & SOC_HW_VERSION_FAM_NUM_BMSK) >>
+			SOC_HW_VERSION_FAM_NUM_SHFT;
+		mhi_cntrl->device_number =
+			(soc_info & SOC_HW_VERSION_DEV_NUM_BMSK) >>
+			SOC_HW_VERSION_DEV_NUM_SHFT;
+		mhi_cntrl->major_version =
+			(soc_info & SOC_HW_VERSION_MAJOR_VER_BMSK) >>
+			SOC_HW_VERSION_MAJOR_VER_SHFT;
+		mhi_cntrl->minor_version =
+			(soc_info & SOC_HW_VERSION_MINOR_VER_BMSK) >>
+			SOC_HW_VERSION_MINOR_VER_SHFT;
 	}
 
 	/* register controller with mhi_bus */
@@ -1140,6 +1316,10 @@ int of_register_mhi_controller(struct mhi_controller *mhi_cntrl)
 	mhi_dev->mhi_cntrl = mhi_cntrl;
 	dev_set_name(&mhi_dev->dev, "%04x_%02u.%02u.%02u", mhi_dev->dev_id,
 		     mhi_dev->domain, mhi_dev->bus, mhi_dev->slot);
+
+	/* init wake source */
+	device_init_wakeup(&mhi_dev->dev, true);
+
 	ret = device_add(&mhi_dev->dev);
 	if (ret)
 		goto error_add_dev;
@@ -1212,6 +1392,7 @@ EXPORT_SYMBOL(mhi_alloc_controller);
 int mhi_prepare_for_power_up(struct mhi_controller *mhi_cntrl)
 {
 	int ret;
+	u32 bhie_off;
 
 	mutex_lock(&mhi_cntrl->pm_mutex);
 
@@ -1221,19 +1402,35 @@ int mhi_prepare_for_power_up(struct mhi_controller *mhi_cntrl)
 		goto error_dev_ctxt;
 	}
 
-	ret = mhi_init_irq_setup(mhi_cntrl);
-	if (ret) {
-		MHI_ERR("Error setting up irq\n");
-		goto error_setup_irq;
-	}
-
 	/*
 	 * allocate rddm table if specified, this table is for debug purpose
 	 * so we'll ignore erros
 	 */
-	if (mhi_cntrl->rddm_size)
+	if (mhi_cntrl->rddm_size) {
 		mhi_alloc_bhie_table(mhi_cntrl, &mhi_cntrl->rddm_image,
 				     mhi_cntrl->rddm_size);
+
+		/*
+		 * This controller supports rddm, we need to manually clear
+		 * BHIE RX registers since por values are undefined.
+		 */
+		if (!mhi_cntrl->bhie) {
+			ret = mhi_read_reg(mhi_cntrl, mhi_cntrl->regs, BHIEOFF,
+					   &bhie_off);
+			if (ret) {
+				MHI_ERR("Error getting bhie offset\n");
+				goto bhie_error;
+			}
+
+			mhi_cntrl->bhie = mhi_cntrl->regs + bhie_off;
+		}
+
+		memset_io(mhi_cntrl->bhie + BHIE_RXVECADDR_LOW_OFFS, 0,
+			  BHIE_RXVECSTATUS_OFFS - BHIE_RXVECADDR_LOW_OFFS + 4);
+
+		if (mhi_cntrl->rddm_image)
+			mhi_rddm_prepare(mhi_cntrl, mhi_cntrl->rddm_image);
+	}
 
 	mhi_cntrl->pre_init = true;
 
@@ -1241,8 +1438,11 @@ int mhi_prepare_for_power_up(struct mhi_controller *mhi_cntrl)
 
 	return 0;
 
-error_setup_irq:
-	mhi_deinit_dev_ctxt(mhi_cntrl);
+bhie_error:
+	if (mhi_cntrl->rddm_image) {
+		mhi_free_bhie_table(mhi_cntrl, mhi_cntrl->rddm_image);
+		mhi_cntrl->rddm_image = NULL;
+	}
 
 error_dev_ctxt:
 	mutex_unlock(&mhi_cntrl->pm_mutex);
@@ -1263,7 +1463,6 @@ void mhi_unprepare_after_power_down(struct mhi_controller *mhi_cntrl)
 		mhi_cntrl->rddm_image = NULL;
 	}
 
-	mhi_deinit_free_irq(mhi_cntrl);
 	mhi_deinit_dev_ctxt(mhi_cntrl);
 	mhi_cntrl->pre_init = false;
 }
@@ -1292,6 +1491,12 @@ static void mhi_release_device(struct device *dev)
 {
 	struct mhi_device *mhi_dev = to_mhi_device(dev);
 
+	if (mhi_dev->ul_chan)
+		mhi_dev->ul_chan->mhi_dev = NULL;
+
+	if (mhi_dev->dl_chan)
+		mhi_dev->dl_chan->mhi_dev = NULL;
+
 	kfree(mhi_dev);
 }
 
@@ -1314,7 +1519,7 @@ static int mhi_driver_probe(struct device *dev)
 	int ret;
 
 	/* bring device out of lpm */
-	ret = mhi_device_get_sync(mhi_dev);
+	ret = mhi_device_get_sync(mhi_dev, MHI_VOTE_DEVICE);
 	if (ret)
 		return ret;
 
@@ -1362,7 +1567,7 @@ static int mhi_driver_probe(struct device *dev)
 		mhi_prepare_for_transfer(mhi_dev);
 
 exit_probe:
-	mhi_device_put(mhi_dev);
+	mhi_device_put(mhi_dev, MHI_VOTE_DEVICE);
 
 	return ret;
 }
@@ -1430,9 +1635,6 @@ static int mhi_driver_remove(struct device *dev)
 
 		mhi_chan->ch_state = MHI_CH_STATE_DISABLED;
 
-		/* remove associated device */
-		mhi_chan->mhi_dev = NULL;
-
 		mutex_unlock(&mhi_chan->mutex);
 	}
 
@@ -1440,11 +1642,13 @@ static int mhi_driver_remove(struct device *dev)
 	if (mhi_cntrl->tsync_dev == mhi_dev)
 		mhi_cntrl->tsync_dev = NULL;
 
-	/* relinquish any pending votes */
-	read_lock_bh(&mhi_cntrl->pm_lock);
-	while (atomic_read(&mhi_dev->dev_wake))
-		mhi_device_put(mhi_dev);
-	read_unlock_bh(&mhi_cntrl->pm_lock);
+	/* relinquish any pending votes for device */
+	while (atomic_read(&mhi_dev->dev_vote))
+		mhi_device_put(mhi_dev, MHI_VOTE_DEVICE);
+
+	/* remove pending votes for the bus */
+	while (atomic_read(&mhi_dev->bus_vote))
+		mhi_device_put(mhi_dev, MHI_VOTE_BUS);
 
 	return 0;
 }
@@ -1488,7 +1692,8 @@ struct mhi_device *mhi_alloc_device(struct mhi_controller *mhi_cntrl)
 	mhi_dev->bus = mhi_cntrl->bus;
 	mhi_dev->slot = mhi_cntrl->slot;
 	mhi_dev->mtu = MHI_MAX_MTU;
-	atomic_set(&mhi_dev->dev_wake, 0);
+	atomic_set(&mhi_dev->dev_vote, 0);
+	atomic_set(&mhi_dev->bus_vote, 0);
 
 	return mhi_dev;
 }
