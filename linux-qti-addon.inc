@@ -71,12 +71,14 @@ do_unpack_extra () {
         git apply ${WORKDIR}/eap-qti-kernel/patches-4.9/0003-msm_rmnet-merge-support-for-RAWIP-msm_rmnet-device.patch
         git apply ${WORKDIR}/eap-qti-kernel/patches-4.9/0004-net-rmnet_data-Add-snapshot-of-rmnet_data-driver.patch
         git apply ${WORKDIR}/eap-qti-kernel/patches-4.9/0005-net-ipv6-Generate-random-IID-for-addresses-on-RAWIP-.patch
+        git apply ${WORKDIR}/eap-qti-kernel/patches-4.9/0006-Add-support-for-upstream-rmnet-driver.patch
         cd -
     elif [ "${@d.getVar('LINUX_VERSION')[0:4]}" = "4.14" ]; then
         cd ${S}
         git apply ${WORKDIR}/eap-qti-kernel/patches-4.14/0001-mhi_bus-core-Add-support-for-MHI-host-interface.patch
         git apply ${WORKDIR}/eap-qti-kernel/patches-4.14/0002-net-Add-the-get-current-NAPI-context-API.patch
         git apply ${WORKDIR}/eap-qti-kernel/patches-4.14/0003-net-ipv6-Generate-random-IID-for-addresses-on-RAWIP-.patch
+        git apply ${WORKDIR}/eap-qti-kernel/patches-4.14/0004-Add-support-for-upstream-rmnet-driver.patch
         cd -
     else
         bbfatal "Kernel version ${LINUX_VERSION} is not supported"
