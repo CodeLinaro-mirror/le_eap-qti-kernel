@@ -1,4 +1,4 @@
-/* Copyright (c) 2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,6 +15,7 @@
 #include <linux/mod_devicetable.h>
 #include <linux/mhi.h>
 #include <net/sock.h>
+#include <linux/of.h>
 
 #include "qrtr.h"
 
@@ -22,9 +23,6 @@ struct qrtr_mhi_dev {
 	struct qrtr_endpoint ep;
 	struct mhi_device *mhi_dev;
 	struct device *dev;
-	size_t bytes_to_rx;
-	size_t in_pkt_len;
-	void *in_pkt;
 	spinlock_t ul_lock;		/* lock to protect ul_pkts */
 	struct list_head ul_pkts;
 };
@@ -53,53 +51,15 @@ static void qcom_mhi_qrtr_dl_callback(struct mhi_device *mhi_dev,
 				      struct mhi_result *mhi_res)
 {
 	struct qrtr_mhi_dev *qdev = dev_get_drvdata(&mhi_dev->dev);
-	int pkt_size;
 	int rc;
 
 	if (!qdev || mhi_res->transaction_status)
 		return;
 
-	/* Check for fragmentation */
-	if (!qdev->bytes_to_rx) {
-		pkt_size = qrtr_peek_pkt_size(mhi_res->buf_addr);
-
-		if (pkt_size <= mhi_res->bytes_xferd) {
-			/* No fragmentation, deliver to qrtr directly */
-			rc = qrtr_endpoint_post(&qdev->ep, mhi_res->buf_addr,
-						mhi_res->bytes_xferd);
-			if (rc == -EINVAL)
-				dev_err(qdev->dev,
-					"invalid ipcrouter packet\n");
-			return;
-		} else {
-			/* Create a buffer to hold the fragments */
-			qdev->bytes_to_rx = pkt_size;
-			qdev->in_pkt_len = 0;
-			qdev->in_pkt = kmalloc(qdev->bytes_to_rx, GFP_ATOMIC);
-			if (!qdev->in_pkt) {
-				qdev->bytes_to_rx = 0;
-				dev_err(qdev->dev,
-					"unable to allocate in_pkt\n");
-				return;
-			}
-		}
-	}
-
-	/* Handle fragmentation */
-	memcpy(qdev->in_pkt + qdev->in_pkt_len, mhi_res->buf_addr,
-	       mhi_res->bytes_xferd);
-	qdev->in_pkt_len += mhi_res->bytes_xferd;
-	qdev->bytes_to_rx -= mhi_res->bytes_xferd;
-
-	if (!qdev->bytes_to_rx) {
-		rc = qrtr_endpoint_post(&qdev->ep, qdev->in_pkt,
-					qdev->in_pkt_len);
-		if (rc == -EINVAL)
-			dev_err(qdev->dev,
-				"invalid ipcrouter packet\n");
-		kfree(qdev->in_pkt);
-		qdev->in_pkt = NULL;
-	}
+	rc = qrtr_endpoint_post(&qdev->ep, mhi_res->buf_addr,
+				mhi_res->bytes_xferd);
+	if (rc == -EINVAL)
+		dev_err(qdev->dev, "invalid ipcrouter packet\n");
 }
 
 /* from mhi to qrtr */
@@ -171,6 +131,8 @@ static int qcom_mhi_qrtr_probe(struct mhi_device *mhi_dev,
 			       const struct mhi_device_id *id)
 {
 	struct qrtr_mhi_dev *qdev;
+	u32 net_id;
+	bool rt;
 	int rc;
 
 	qdev = devm_kzalloc(&mhi_dev->dev, sizeof(*qdev), GFP_KERNEL);
@@ -181,10 +143,16 @@ static int qcom_mhi_qrtr_probe(struct mhi_device *mhi_dev,
 	qdev->dev = &mhi_dev->dev;
 	qdev->ep.xmit = qcom_mhi_qrtr_send;
 
+	rc = of_property_read_u32(mhi_dev->dev.of_node, "qcom,net-id", &net_id);
+	if (rc < 0)
+		net_id = QRTR_EP_NET_ID_AUTO;
+
+	rt = of_property_read_bool(mhi_dev->dev.of_node, "qcom,low-latency");
+
 	INIT_LIST_HEAD(&qdev->ul_pkts);
 	spin_lock_init(&qdev->ul_lock);
 
-	rc = qrtr_endpoint_register(&qdev->ep, QRTR_EP_NID_AUTO);
+	rc = qrtr_endpoint_register(&qdev->ep, net_id, rt);
 	if (rc)
 		return rc;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -179,7 +179,7 @@ exit_free_skb:
 }
 
 static int qcom_usb_qrtr_probe(struct usb_interface *interface,
-					 const struct usb_device_id *id)
+			       const struct usb_device_id *id)
 {
 	struct qrtr_usb_dev *qdev;
 	struct usb_device *udev;
@@ -223,7 +223,7 @@ static int qcom_usb_qrtr_probe(struct usb_interface *interface,
 
 	init_usb_anchor(&qdev->submitted);
 
-	rc = qrtr_endpoint_register(&qdev->ep, QRTR_EP_NID_AUTO);
+	rc = qrtr_endpoint_register(&qdev->ep, QRTR_EP_NID_AUTO, false);
 	if (rc)
 		return rc;
 
@@ -274,7 +274,7 @@ static int qcom_usb_qrtr_reset_resume(struct usb_interface *intf)
 	int rc = 0;
 
 	qrtr_endpoint_unregister(&qdev->ep);
-	rc = qrtr_endpoint_register(&qdev->ep, QRTR_EP_NID_AUTO);
+	rc = qrtr_endpoint_register(&qdev->ep, QRTR_EP_NID_AUTO, false);
 	if (rc)
 		return rc;
 
@@ -301,6 +301,8 @@ static void qcom_usb_qrtr_disconnect(struct usb_interface *interface)
 static const struct usb_device_id qcom_usb_qrtr_ids[] = {
 	{ USB_DEVICE_INTERFACE_NUMBER(QRTR_VENDOR_ID, 0x90ef, 3) },
 	{ USB_DEVICE_INTERFACE_NUMBER(QRTR_VENDOR_ID, 0x90f0, 3) },
+	{ USB_DEVICE_INTERFACE_NUMBER(QRTR_VENDOR_ID, 0x90f3, 2) },
+	{ USB_DEVICE_INTERFACE_NUMBER(QRTR_VENDOR_ID, 0x90fd, 1) },
 	{ } /* Terminating entry */
 };
 MODULE_DEVICE_TABLE(usb, qcom_usb_qrtr_ids);
