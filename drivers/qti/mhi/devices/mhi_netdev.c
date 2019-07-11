@@ -24,6 +24,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/version.h>
 #include <linux/mhi.h>
+#include <linux/etherdevice.h>
 
 #define MHI_NETDEV_DRIVER_NAME "mhi_netdev"
 #define WATCHDOG_TIMEOUT (30 * HZ)
@@ -97,6 +98,7 @@ struct mhi_netdev {
 	const char *interface_name;
 	struct napi_struct *napi;
 	struct net_device *ndev;
+	bool ethernet_interface;
 
 	struct mhi_netbuf **netbuf_pool;
 	int pool_size; /* must be power of 2 */
@@ -535,7 +537,7 @@ static const struct net_device_ops mhi_netdev_ops_ip = {
 	.ndo_validate_addr = 0,
 };
 
-static void mhi_netdev_setup(struct net_device *dev)
+static void mhi_netdev_rawip_setup(struct net_device *dev)
 {
 	dev->netdev_ops = &mhi_netdev_ops_ip;
 	ether_setup(dev);
@@ -547,6 +549,18 @@ static void mhi_netdev_setup(struct net_device *dev)
 	dev->addr_len = 0;
 	dev->flags &= ~(IFF_BROADCAST | IFF_MULTICAST);
 	dev->watchdog_timeo = WATCHDOG_TIMEOUT;
+#if (KERNEL_VERSION(4, 14, 0) < LINUX_VERSION_CODE)
+	dev->max_mtu = ETH_MAX_MTU;
+#endif
+}
+
+static void mhi_netdev_ether_setup(struct net_device *dev)
+{
+	dev->netdev_ops = &mhi_netdev_ops_ip;
+	ether_setup(dev);
+#if (KERNEL_VERSION(4, 14, 0) < LINUX_VERSION_CODE)
+	dev->max_mtu = ETH_MAX_MTU;
+#endif
 }
 
 /* enable mhi_netdev netdev, call only after grabbing mhi_netdev.mutex */
@@ -574,10 +588,22 @@ static int mhi_netdev_enable_iface(struct mhi_netdev *mhi_netdev)
 
 	snprintf(ifname, sizeof(ifname), "%s%%d", mhi_netdev->interface_name);
 
+	mhi_netdev->ethernet_interface = of_property_read_bool(of_node,
+			"mhi,ethernet-interface");
+
 	rtnl_lock();
 	mhi_netdev->ndev = alloc_netdev(sizeof(*mhi_netdev_priv),
 					ifname, NET_NAME_PREDICTABLE,
-					mhi_netdev_setup);
+					mhi_netdev->ethernet_interface ?
+					mhi_netdev_ether_setup :
+					mhi_netdev_rawip_setup);
+
+	if (mhi_netdev->ethernet_interface) {
+		eth_random_addr(mhi_netdev->ndev->dev_addr);
+		if (!is_valid_ether_addr(mhi_netdev->ndev->dev_addr))
+			return -EADDRNOTAVAIL;
+	}
+
 	if (!mhi_netdev->ndev) {
 		rtnl_unlock();
 		return -ENOMEM;
@@ -648,10 +674,21 @@ static void mhi_netdev_push_skb(struct mhi_netdev *mhi_netdev,
 		return;
 	}
 
-	skb_add_rx_frag(skb, 0, mhi_buf->page, 0,
-			mhi_result->bytes_xferd, mhi_netdev->mru);
 	skb->dev = mhi_netdev->ndev;
-	skb->protocol = mhi_netdev_ip_type_trans(*(u8 *)mhi_buf->buf);
+
+	if (mhi_netdev->ethernet_interface) {
+		skb_put(skb, mhi_result->bytes_xferd);
+		skb_copy_to_linear_data(skb, mhi_buf->buf,
+				mhi_result->bytes_xferd);
+
+		skb->protocol = eth_type_trans(skb, mhi_netdev->ndev);
+	} else {
+		skb_add_rx_frag(skb, 0, mhi_buf->page, 0,
+			mhi_result->bytes_xferd, mhi_netdev->mru);
+
+		skb->protocol = mhi_netdev_ip_type_trans(*(u8 *)mhi_buf->buf);
+	}
+
 	netif_receive_skb(skb);
 }
 
@@ -685,13 +722,25 @@ static void mhi_netdev_xfer_dl_cb(struct mhi_device *mhi_dev,
 	/* we support chaining */
 	skb = alloc_skb(0, GFP_ATOMIC);
 	if (likely(skb)) {
-		skb_add_rx_frag(skb, 0, mhi_buf->page, 0,
+		if (mhi_netdev->ethernet_interface) {
+			skb_put(skb, mhi_result->bytes_xferd);
+			skb_copy_to_linear_data(skb, mhi_buf->buf,
+					mhi_result->bytes_xferd);
+		} else {
+			skb_add_rx_frag(skb, 0, mhi_buf->page, 0,
 				mhi_result->bytes_xferd, mhi_netdev->mru);
+		}
+
 		/* this is first on list */
 		if (!chain->head) {
 			skb->dev = ndev;
-			skb->protocol =
+			if (mhi_netdev->ethernet_interface)
+				skb->protocol =
+				eth_type_trans(skb, mhi_netdev->ndev);
+			else
+				skb->protocol =
 				mhi_netdev_ip_type_trans(*(u8 *)mhi_buf->buf);
+
 			chain->head = skb;
 		} else {
 			skb_shinfo(chain->tail)->frag_list = skb;
@@ -919,6 +968,7 @@ static const struct mhi_device_id mhi_netdev_match_table[] = {
 	{ .chan = "IP_HW0" },
 	{ .chan = "IP_HW0_RSC" },
 	{ .chan = "IP_SW0" },
+	{ .chan = "IP_HW1" },
 	{},
 };
 
