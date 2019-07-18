@@ -369,7 +369,7 @@ void usb_bridge_interface_release(struct usb_interface *interface)
 static int usb_bridge_status(struct seq_file *s, void *unused)
 {
 	struct ub_func *func = NULL;
-	struct ub_debug dbg[USB_MAXCONFIG] = {0};
+	struct ub_debug dbg[USB_MAXCONFIG] = {{ 0 }};
 	int fcount = 0;
 	int nume = 0;
 	int num_funcs = 0;
