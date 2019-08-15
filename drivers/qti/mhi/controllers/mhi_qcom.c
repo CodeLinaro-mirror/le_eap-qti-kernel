@@ -892,12 +892,11 @@ static int mhi_platform_probe(struct platform_device *pdev)
 	if (ret)
 		goto error_register;
 
-	return mhi_cntrl;
+	return 0;
 
 error_register:
 	mhi_free_controller(mhi_cntrl);
-
-	return ERR_PTR(-EINVAL);
+	return ret;
 }
 
 static struct platform_driver mhi_platform_driver = {
