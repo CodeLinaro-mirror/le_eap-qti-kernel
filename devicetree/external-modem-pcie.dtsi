@@ -330,7 +330,6 @@
 				mhi,chan = "IP_SW0";
 				mhi,interface-name = "mhi_swip";
 				mhi,mru = <0x4000>;
-				mhi,ethernet-interface;
 				mhi,disable-chain-skb;
 			};
 		};
