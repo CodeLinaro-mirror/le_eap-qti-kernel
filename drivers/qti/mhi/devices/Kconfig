@@ -2,7 +2,7 @@ menu "MHI device support"
 
 config QTI_MHI_NETDEV
        tristate "MHI NETDEV"
-       depends on QTI_MHI_BUS && QTI_RMNET_DATA
+       depends on QTI_MHI_BUS && QTI_RMNET
        help
 	  MHI based net device driver for transferring IP traffic
 	  between host and modem. By enabling this driver, clients
