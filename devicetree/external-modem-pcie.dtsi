@@ -31,6 +31,7 @@
 		/* mhi bus specific settings */
 		mhi,max-channels = <110>;
 		mhi,timeout = <2000>;
+		mhi,buffer-len = <0x8000>;
 
 		mhi_channels {
 			#address-cells = <1>;
