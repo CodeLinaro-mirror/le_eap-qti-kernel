@@ -24,6 +24,7 @@
 		qcom,pci-bus = <1>;
 		qcom,pci-slot = <0>;
 		qcom,smmu-cfg = <0x3>;
+		mhi,buffer-len = <0x8000>;
 
 		/* mhi bus specific settings */
 		mhi,max-channels = <106>;
