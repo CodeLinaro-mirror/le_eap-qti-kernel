@@ -34,9 +34,6 @@
 #include "diagfwd_socket.h"
 #include "diag_ipc_logging.h"
 
-#include <soc/qcom/subsystem_notif.h>
-#include <soc/qcom/subsystem_restart.h>
-
 #define DIAG_SVC_ID		0x1001
 
 #define MODEM_INST_BASE		0
@@ -57,7 +54,6 @@
 #define DIAG_SO_RCVBUF_SIZE	(MAX_BUF_SIZE * MAX_NO_PACKETS)
 
 struct qmi_handle *cntl_qmi;
-static uint64_t bootup_req[NUM_SOCKET_SUBSYSTEMS];
 
 struct diag_socket_info socket_data[NUM_PERIPHERALS] = {
 	{
@@ -224,86 +220,6 @@ struct diag_socket_info socket_dci_cmd[NUM_PERIPHERALS] = {
 	},
 };
 
-struct restart_notifier_block {
-	unsigned int processor;
-	char *name;
-	struct notifier_block nb;
-};
-
-static int restart_notifier_cb(struct notifier_block *this, unsigned long code,
-	void *_cmd)
-{
-	struct restart_notifier_block *notifier;
-
-	notifier = container_of(this,
-			struct restart_notifier_block, nb);
-	if (!notifier) {
-		DIAG_LOG(DIAG_DEBUG_PERIPHERALS,
-			"diag: %s: invalid notifier block\n", __func__);
-		return NOTIFY_DONE;
-	}
-
-	DIAG_LOG(DIAG_DEBUG_PERIPHERALS,
-		"%s: ssr for processor %d ('%s')\n",
-		__func__, notifier->processor, notifier->name);
-
-	switch (code) {
-
-	case SUBSYS_BEFORE_SHUTDOWN:
-		DIAG_LOG(DIAG_DEBUG_PERIPHERALS,
-			"diag: %s: SUBSYS_BEFORE_SHUTDOWN\n", __func__);
-		mutex_lock(&driver->diag_notifier_mutex);
-		bootup_req[notifier->processor] = PERIPHERAL_SSR_DOWN;
-		DIAG_LOG(DIAG_DEBUG_PERIPHERALS,
-		"diag: bootup_req[%s] = %d\n",
-		notifier->name, (int)bootup_req[notifier->processor]);
-		mutex_unlock(&driver->diag_notifier_mutex);
-		break;
-
-	case SUBSYS_AFTER_SHUTDOWN:
-		DIAG_LOG(DIAG_DEBUG_PERIPHERALS,
-			"diag: %s: SUBSYS_AFTER_SHUTDOWN\n", __func__);
-		break;
-
-	case SUBSYS_BEFORE_POWERUP:
-		DIAG_LOG(DIAG_DEBUG_PERIPHERALS,
-			"diag: %s: SUBSYS_BEFORE_POWERUP\n", __func__);
-		break;
-
-	case SUBSYS_AFTER_POWERUP:
-		DIAG_LOG(DIAG_DEBUG_PERIPHERALS,
-			"diag: %s: SUBSYS_AFTER_POWERUP\n", __func__);
-		mutex_lock(&driver->diag_notifier_mutex);
-		if (!bootup_req[notifier->processor]) {
-			bootup_req[notifier->processor] = PERIPHERAL_SSR_DOWN;
-			DIAG_LOG(DIAG_DEBUG_PERIPHERALS,
-			"diag: bootup_req[%s] = %d\n",
-			notifier->name, (int)bootup_req[notifier->processor]);
-			mutex_unlock(&driver->diag_notifier_mutex);
-			break;
-		}
-		bootup_req[notifier->processor] = PERIPHERAL_SSR_UP;
-		DIAG_LOG(DIAG_DEBUG_PERIPHERALS,
-		"diag: bootup_req[%s] = %d\n",
-		notifier->name, (int)bootup_req[notifier->processor]);
-		mutex_unlock(&driver->diag_notifier_mutex);
-		break;
-
-	default:
-		DIAG_LOG(DIAG_DEBUG_PERIPHERALS,
-			"diag: code: %lu\n", code);
-		break;
-	}
-	return NOTIFY_DONE;
-}
-
-static struct restart_notifier_block restart_notifiers[] = {
-	{SOCKET_MODEM, "modem", .nb.notifier_call = restart_notifier_cb},
-	{SOCKET_ADSP, "adsp", .nb.notifier_call = restart_notifier_cb},
-	{SOCKET_WCNSS, "wcnss", .nb.notifier_call = restart_notifier_cb},
-	{SOCKET_SLPI, "slpi", .nb.notifier_call = restart_notifier_cb},
-	{SOCKET_CDSP, "cdsp", .nb.notifier_call = restart_notifier_cb},
-};
 
 void diag_socket_invalidate(void *ctxt, struct diagfwd_info *fwd_ctxt)
 {
@@ -631,12 +547,6 @@ static void handle_ctrl_pkt(struct diag_socket_info *info, void *buf, int len)
 			DIAG_LOG(DIAG_DEBUG_PERIPHERALS, "%s rcvd bye\n",
 				 info->name);
 
-			mutex_lock(&driver->diag_notifier_mutex);
-			if (bootup_req[info->peripheral] == PERIPHERAL_SSR_UP)
-				DIAG_LOG(DIAG_DEBUG_PERIPHERALS,
-				"diag: %s is up, bootup_req = %d\n",
-				info->name, (int)bootup_req[info->peripheral]);
-			mutex_unlock(&driver->diag_notifier_mutex);
 			socket_close_channel(info);
 		}
 		break;
@@ -649,15 +559,6 @@ static void handle_ctrl_pkt(struct diag_socket_info *info, void *buf, int len)
 			DIAG_LOG(DIAG_DEBUG_PERIPHERALS, "%s rcvd del client\n",
 				 info->name);
 
-			mutex_lock(&driver->diag_notifier_mutex);
-			if (bootup_req[info->peripheral] == PERIPHERAL_SSR_UP) {
-				DIAG_LOG(DIAG_DEBUG_PERIPHERALS,
-				"diag: %s is up, stopping cleanup: bootup_req = %d\n",
-				info->name, (int)bootup_req[info->peripheral]);
-				mutex_unlock(&driver->diag_notifier_mutex);
-				break;
-			}
-			mutex_unlock(&driver->diag_notifier_mutex);
 			socket_close_channel(info);
 		}
 		break;
@@ -1082,11 +983,8 @@ static struct qmi_ops diag_qmi_cntl_ops = {
 int diag_socket_init(void)
 {
 	struct diag_socket_info *info = NULL;
-	struct restart_notifier_block *nb;
 	int peripheral;
-	void *handle;
 	int rc;
-	int i;
 
 	for (peripheral = 0; peripheral < NUM_PERIPHERALS; peripheral++) {
 		info = &socket_cntl[peripheral];
@@ -1099,14 +997,6 @@ int diag_socket_init(void)
 		__diag_socket_init(&socket_cmd[peripheral]);
 		__diag_socket_init(&socket_dci[peripheral]);
 		__diag_socket_init(&socket_dci_cmd[peripheral]);
-	}
-
-	for (i = 0; i < ARRAY_SIZE(restart_notifiers); i++) {
-		nb = &restart_notifiers[i];
-		handle = subsys_notif_register_notifier(nb->name, &nb->nb);
-		DIAG_LOG(DIAG_DEBUG_PERIPHERALS,
-			 "%s: registering notifier for '%s', handle=%p\n",
-			 __func__, nb->name, handle);
 	}
 
 	cntl_qmi = kzalloc(sizeof(*cntl_qmi), GFP_KERNEL);

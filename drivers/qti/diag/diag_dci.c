@@ -25,8 +25,12 @@
 #include <linux/ratelimit.h>
 #include <linux/reboot.h>
 #include <asm/current.h>
-#include <soc/qcom/restart.h>
+#include <linux/version.h>
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0))
+#include <linux/signal.h>
+#else
 #include <linux/sched/signal.h>
+#endif
 #include <linux/vmalloc.h>
 #ifdef CONFIG_QTI_DIAG_OVER_USB
 #include <linux/usb/usbdiag.h>
@@ -1941,8 +1945,6 @@ fill_buffer:
 			 * time for the response to reach the client.
 			 */
 			usleep_range(5000, 5100);
-			/* call download API */
-			msm_set_restart_mode(RESTART_DLOAD);
 			pr_alert("diag: download mode set, Rebooting SoC..\n");
 			kernel_restart(NULL);
 		}
