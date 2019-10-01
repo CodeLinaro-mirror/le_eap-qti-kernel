@@ -22,7 +22,10 @@
 #include <linux/sched.h>
 #include <linux/ratelimit.h>
 #include <linux/timer.h>
+#include <linux/version.h>
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0))
 #include <linux/sched/task.h>
+#endif
 #ifdef CONFIG_QTI_DIAG_OVER_USB
 #include <linux/usb/usbdiag.h>
 #endif
@@ -43,9 +46,6 @@
 #include "diagfwd_peripheral.h"
 #include "diagfwd_mhi.h"
 #include "diagfwd_hsic.h"
-#include "diag_pcie.h"
-
-#include <linux/coresight-stm.h>
 #include <linux/kernel.h>
 #ifdef CONFIG_COMPAT
 #include <linux/compat.h>
@@ -90,7 +90,7 @@ module_param(poolsize_user, uint, 0000);
  */
 static unsigned int itemsize_usb_apps = sizeof(struct diag_request);
 static unsigned int poolsize_usb_apps = 10;
-static unsigned int itemsize_pcie_apps = sizeof(struct mhi_req);
+static unsigned int itemsize_pcie_apps = 0;
 static unsigned int poolsize_pcie_apps = 10;
 module_param(poolsize_usb_apps, uint, 0000);
 
@@ -3514,7 +3514,6 @@ static int diag_user_process_apps_data(const char __user *buf, int len,
 				       int pkt_type)
 {
 	int ret = 0;
-	int stm_size = 0;
 	const int mempool = POOL_TYPE_COPY;
 	unsigned char *user_space_data = NULL;
 	uint8_t hdlc_disabled;
@@ -3552,20 +3551,6 @@ static int diag_user_process_apps_data(const char __user *buf, int len,
 		user_space_data = NULL;
 		diag_record_stats(pkt_type, PKT_DROP);
 		return -EBADMSG;
-	}
-
-	if (driver->stm_state[APPS_DATA] &&
-	    (pkt_type >= DATA_TYPE_EVENT) && (pkt_type <= DATA_TYPE_LOG)) {
-		stm_size = stm_log_inv_ts(OST_ENTITY_DIAG, 0, user_space_data,
-					  len);
-		if (stm_size == 0) {
-			pr_debug("diag: In %s, stm_log_inv_ts returned size of 0\n",
-				 __func__);
-		}
-		diagmem_free(driver, user_space_data, mempool);
-		user_space_data = NULL;
-
-		return 0;
 	}
 
 	mutex_lock(&apps_data_mutex);
