@@ -30,6 +30,7 @@
 #define WATCHDOG_TIMEOUT (30 * HZ)
 #define IPC_LOG_PAGES (100)
 #define MAX_NETBUF_SIZE (128)
+#define MHI_NET_MAX_MTU (0x4000)
 
 #ifdef CONFIG_QTI_MHI_DEBUG
 
@@ -412,7 +413,8 @@ static int mhi_netdev_change_mtu(struct net_device *dev, int new_mtu)
 	struct mhi_netdev *mhi_netdev = mhi_netdev_priv->mhi_netdev;
 	struct mhi_device *mhi_dev = mhi_netdev->mhi_dev;
 
-	if (new_mtu < 0 || mhi_dev->mtu < new_mtu)
+	if (new_mtu < 0 || mhi_dev->mtu < new_mtu ||
+	    new_mtu >= MHI_NET_MAX_MTU)
 		return -EINVAL;
 
 	dev->mtu = new_mtu;
@@ -550,7 +552,7 @@ static void mhi_netdev_rawip_setup(struct net_device *dev)
 	dev->flags &= ~(IFF_BROADCAST | IFF_MULTICAST);
 	dev->watchdog_timeo = WATCHDOG_TIMEOUT;
 #if (KERNEL_VERSION(4, 14, 0) < LINUX_VERSION_CODE)
-	dev->max_mtu = ETH_MAX_MTU;
+	dev->max_mtu = MHI_NET_MAX_MTU;
 #endif
 }
 
@@ -559,7 +561,7 @@ static void mhi_netdev_ether_setup(struct net_device *dev)
 	dev->netdev_ops = &mhi_netdev_ops_ip;
 	ether_setup(dev);
 #if (KERNEL_VERSION(4, 14, 0) < LINUX_VERSION_CODE)
-	dev->max_mtu = ETH_MAX_MTU;
+	dev->max_mtu = MHI_NET_MAX_MTU;
 #endif
 }
 
@@ -609,7 +611,10 @@ static int mhi_netdev_enable_iface(struct mhi_netdev *mhi_netdev)
 		return -ENOMEM;
 	}
 
-	mhi_netdev->ndev->mtu = mhi_dev->mtu;
+	if (mhi_dev->mtu > MHI_NET_MAX_MTU)
+		mhi_netdev->ndev->mtu = MHI_NET_MAX_MTU;
+	else
+		mhi_netdev->ndev->mtu = mhi_dev->mtu;
 	SET_NETDEV_DEV(mhi_netdev->ndev, &mhi_dev->dev);
 	dev_set_alias(mhi_netdev->ndev, ifalias, strlen(ifalias));
 	mhi_netdev_priv = netdev_priv(mhi_netdev->ndev);
