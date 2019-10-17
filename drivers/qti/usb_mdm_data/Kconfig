@@ -1,0 +1,14 @@
+config QTI_USB_F_MDM_DATA
+	tristate
+	select USB_LIBCOMPOSITE
+
+config QTI_USB_MDM_DATA_BRIDGE
+	tristate "USB QTI modem data bridge driver"
+	depends on USB
+	select QTI_USB_F_MDM_DATA
+	help
+	  Say Y here if you have a QTI modem device connected via USB that
+	  will be bridged in kernel space. This driver works as a bridge to pass
+	  data packets between the modem and peripheral usb gadget driver.
+	  To compile this driver as a module, choose M here: the module
+	  will be called mdm_data_bridge. If unsure, choose N.
