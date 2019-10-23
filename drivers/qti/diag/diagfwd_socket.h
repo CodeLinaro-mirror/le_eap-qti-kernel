@@ -14,7 +14,7 @@
 #define DIAGFWD_SOCKET_H
 
 #include <linux/socket.h>
-#include <linux/soc/qcom/qmi.h>
+#include <linux/qmi.h>
 
 #define DIAG_SOCKET_NAME_SZ		24
 

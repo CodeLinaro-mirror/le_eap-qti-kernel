@@ -14,7 +14,12 @@
 #include <linux/diagchar.h>
 #include <linux/kmemleak.h>
 #include <linux/delay.h>
+#include <linux/version.h>
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0))
+#include <linux/signal.h>
+#else
 #include <linux/sched/signal.h>
+#endif
 #include "diagchar.h"
 #include "diagfwd.h"
 #include "diagfwd_cntl.h"

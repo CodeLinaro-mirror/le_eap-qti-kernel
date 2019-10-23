@@ -12,9 +12,9 @@
 
 #ifndef DIAGIPCLOG_H
 #define DIAGIPCLOG_H
-
+#ifdef CONFIG_IPC_LOGGING
 #include <linux/ipc_logging.h>
-
+#endif
 #define DIAG_IPC_LOG_PAGES	50
 
 #define DIAG_DEBUG_USERSPACE	0x0001
