@@ -1,5 +1,6 @@
 config QTI_USB_F_DIAG
 	bool "USB diag function"
+	depends on USB_LIBCOMPOSITE
 	help
 	  Diag function driver enables support for QTI diagnostics
 	  port over USB.
