@@ -26,6 +26,9 @@
 #ifdef CONFIG_QTI_DIAG_OVER_USB
 #include <linux/usb/usbdiag.h>
 #endif
+#ifdef CONFIG_QCOM_SOC_INFO
+#include <soc/qcom/socinfo.h>
+#endif
 #include "diagmem.h"
 #include "diagchar.h"
 #include "diagfwd.h"
@@ -845,7 +848,11 @@ int diag_cmd_get_mobile_id(unsigned char *src_buf, int src_len,
 	rsp.padding[1] = 0;
 	rsp.padding[2] = 0;
 	rsp.family = 0;
+#ifdef CONFIG_QCOM_SOC_INFO
+	rsp.chip_id = (uint32_t)socinfo_get_id();
+#else
 	rsp.chip_id = 0;
+#endif
 
 	memcpy(dest_buf, &rsp, sizeof(rsp));
 	write_len += sizeof(rsp);
