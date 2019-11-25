@@ -19,7 +19,6 @@
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <net/ip6_checksum.h>
-#include <net/sock.h>
 #include "rmnet_private.h"
 #include "rmnet_config.h"
 #include "rmnet_vnd.h"
@@ -27,11 +26,30 @@
 #include "rmnet_handlers.h"
 #include "rmnet_descriptor.h"
 
+#include <linux/rmnet_qmi.h>
+#include <linux/qmi_rmnet.h>
+
 #define CREATE_TRACE_POINTS
 #include "rmnet_trace.h"
 
 #define RMNET_IP_VERSION_4 0x40
 #define RMNET_IP_VERSION_6 0x60
+
+EXPORT_TRACEPOINT_SYMBOL(rmnet_shs_low);
+EXPORT_TRACEPOINT_SYMBOL(rmnet_shs_high);
+EXPORT_TRACEPOINT_SYMBOL(rmnet_shs_err);
+EXPORT_TRACEPOINT_SYMBOL(rmnet_shs_wq_low);
+EXPORT_TRACEPOINT_SYMBOL(rmnet_shs_wq_high);
+EXPORT_TRACEPOINT_SYMBOL(rmnet_shs_wq_err);
+EXPORT_TRACEPOINT_SYMBOL(rmnet_perf_low);
+EXPORT_TRACEPOINT_SYMBOL(rmnet_perf_high);
+EXPORT_TRACEPOINT_SYMBOL(rmnet_perf_err);
+EXPORT_TRACEPOINT_SYMBOL(rmnet_low);
+EXPORT_TRACEPOINT_SYMBOL(rmnet_high);
+EXPORT_TRACEPOINT_SYMBOL(rmnet_err);
+EXPORT_TRACEPOINT_SYMBOL(rmnet_freq_update);
+EXPORT_TRACEPOINT_SYMBOL(rmnet_freq_reset);
+EXPORT_TRACEPOINT_SYMBOL(rmnet_freq_boost);
 
 /* Helper Functions */
 
@@ -87,6 +105,8 @@ rmnet_deliver_skb(struct sk_buff *skb, struct rmnet_port *port)
 	int (*rmnet_shs_stamp)(struct sk_buff *skb, struct rmnet_port *port);
 	struct rmnet_priv *priv = netdev_priv(skb->dev);
 
+	trace_rmnet_low(RMNET_MODULE, RMNET_DLVR_SKB, 0xDEF, 0xDEF,
+			0xDEF, 0xDEF, (void *)skb, NULL);
 	skb_reset_transport_header(skb);
 	skb_reset_network_header(skb);
 	rmnet_vnd_rx_fixup(skb->dev, skb->len);
@@ -130,6 +150,8 @@ rmnet_deliver_skb_wq(struct sk_buff *skb, struct rmnet_port *port,
 	int (*rmnet_shs_stamp)(struct sk_buff *skb, struct rmnet_port *port);
 	struct rmnet_priv *priv = netdev_priv(skb->dev);
 
+	trace_rmnet_low(RMNET_MODULE, RMNET_DLVR_SKB, 0xDEF, 0xDEF,
+			0xDEF, 0xDEF, (void *)skb, NULL);
 	skb_reset_transport_header(skb);
 	skb_reset_network_header(skb);
 	rmnet_vnd_rx_fixup(skb->dev, skb->len);
@@ -288,6 +310,7 @@ __rmnet_map_ingress_handler(struct sk_buff *skb,
 
 	qmap = (struct rmnet_map_header *)rmnet_map_data_ptr(skb);
 	if (qmap->cd_bit) {
+		qmi_rmnet_set_dl_msg_active(port);
 		if (port->data_format & RMNET_INGRESS_FORMAT_DL_MARKER) {
 			if (!rmnet_map_flow_command(skb, port, false))
 				return;
@@ -334,6 +357,9 @@ __rmnet_map_ingress_handler(struct sk_buff *skb,
 		/* Push the single packet onto the list */
 		__skb_queue_tail(&list, skb);
 	}
+
+	if (port->data_format & RMNET_INGRESS_FORMAT_PS)
+		qmi_rmnet_work_maybe_restart(port);
 
 	rmnet_deliver_skb_list(&list, port);
 	return;
@@ -483,6 +509,8 @@ rx_handler_result_t rmnet_rx_handler(struct sk_buff **pskb)
 	if (skb->pkt_type == PACKET_LOOPBACK)
 		return RX_HANDLER_PASS;
 
+	trace_rmnet_low(RMNET_MODULE, RMNET_RCV_FROM_PND, 0xDEF,
+			0xDEF, 0xDEF, 0xDEF, NULL, NULL);
 	dev = skb->dev;
 	port = rmnet_get_port(dev);
 
@@ -512,6 +540,10 @@ void rmnet_egress_handler(struct sk_buff *skb)
 	u8 mux_id;
 	int err;
 	u32 skb_len;
+
+	trace_rmnet_low(RMNET_MODULE, RMNET_TX_UL_PKT, 0xDEF, 0xDEF, 0xDEF,
+			0xDEF, (void *)skb, NULL);
+	skb_orphan(skb);
 
 	orig_dev = skb->dev;
 	priv = netdev_priv(orig_dev);

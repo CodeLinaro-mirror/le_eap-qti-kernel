@@ -24,6 +24,10 @@
 #include "rmnet_private.h"
 #include "rmnet_map.h"
 #include "rmnet_vnd.h"
+#include "rmnet_trace.h"
+
+#include <linux/qmi_rmnet.h>
+#include <linux/rmnet_qmi.h>
 
 /* RX/TX Fixup */
 
@@ -69,7 +73,10 @@ static netdev_tx_t rmnet_vnd_start_xmit(struct sk_buff *skb,
 					AF_INET : AF_INET6;
 		mark = skb->mark;
 		len = skb->len;
+		trace_rmnet_xmit_skb(skb);
 		rmnet_egress_handler(skb);
+		qmi_rmnet_burst_fc_check(dev, ip_type, mark, len);
+		qmi_rmnet_work_maybe_restart(rmnet_get_rmnet_port(dev));
 	} else {
 		this_cpu_inc(priv->pcpu_stats->stats.tx_drops);
 		kfree_skb(skb);
@@ -122,6 +129,7 @@ static void rmnet_vnd_uninit(struct net_device *dev)
 	qos = priv->qos_info;
 	RCU_INIT_POINTER(priv->qos_info, NULL);
 	synchronize_rcu();
+	qmi_rmnet_qos_exit(dev, qos);
 }
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0))
@@ -164,6 +172,20 @@ static void rmnet_get_stats64(struct net_device *dev,
 #endif
 }
 
+static u16 rmnet_vnd_select_queue(struct net_device *dev,
+				  struct sk_buff *skb,
+				  void *accel_priv,
+				  select_queue_fallback_t fallback)
+{
+	struct rmnet_priv *priv = netdev_priv(dev);
+	int txq = 0;
+
+	if (priv->real_dev)
+		txq = qmi_rmnet_get_queue(dev, skb);
+
+	return (txq < dev->real_num_tx_queues) ? txq : 0;
+}
+
 static const struct net_device_ops rmnet_vnd_ops = {
 	.ndo_start_xmit = rmnet_vnd_start_xmit,
 	.ndo_change_mtu = rmnet_vnd_change_mtu,
@@ -173,6 +195,7 @@ static const struct net_device_ops rmnet_vnd_ops = {
 	.ndo_init       = rmnet_vnd_init,
 	.ndo_uninit     = rmnet_vnd_uninit,
 	.ndo_get_stats64 = rmnet_get_stats64,
+	.ndo_select_queue = rmnet_vnd_select_queue,
 };
 
 static const char rmnet_gstrings_stats[][ETH_GSTRING_LEN] = {
@@ -222,6 +245,8 @@ static const char rmnet_port_gstrings_stats[][ETH_GSTRING_LEN] = {
 	"DL header total pkts received",
 	"DL trailer last seen sequence",
 	"DL trailer pkts received",
+	"UL agg reuse",
+	"UL agg alloc",
 };
 
 static void rmnet_get_strings(struct net_device *dev, u32 stringset, u8 *buf)
@@ -272,6 +297,7 @@ static int rmnet_stats_reset(struct net_device *dev)
 {
 	struct rmnet_priv *priv = netdev_priv(dev);
 	struct rmnet_port_priv_stats *stp;
+	struct rmnet_priv_stats *st;
 	struct rmnet_port *port;
 
 	port = rmnet_get_port(priv->real_dev);
@@ -281,6 +307,11 @@ static int rmnet_stats_reset(struct net_device *dev)
 	stp = &port->stats;
 
 	memset(stp, 0, sizeof(*stp));
+
+	st = &priv->stats;
+
+	memset(st, 0, sizeof(*st));
+
 	return 0;
 }
 
@@ -333,7 +364,6 @@ int rmnet_vnd_newlink(u8 id, struct net_device *rmnet_dev,
 	rmnet_dev->hw_features = NETIF_F_RXCSUM;
 	rmnet_dev->hw_features |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
 	rmnet_dev->hw_features |= NETIF_F_SG;
-	rmnet_dev->hw_features |= NETIF_F_GRO;
 
 	priv->real_dev = real_dev;
 
@@ -346,6 +376,7 @@ int rmnet_vnd_newlink(u8 id, struct net_device *rmnet_dev,
 		rmnet_dev->rtnl_link_ops = &rmnet_link_ops;
 
 		priv->mux_id = id;
+		priv->qos_info = qmi_rmnet_qos_init(real_dev, id);
 
 		netdev_dbg(rmnet_dev, "rmnet dev created\n");
 	}

@@ -30,6 +30,11 @@ RMNET_INGRESS_FORMAT_DL_MARKER_V2)
 #define RMNET_INGRESS_FORMAT_PS                 BIT(27)
 #define RMNET_FORMAT_PS_NOTIF                   BIT(26)
 
+/* UL Aggregation parameters */
+#define RMNET_PAGE_RECYCLE                      BIT(0)
+
+#define RMNET_SKB_GSO_UDP_L4			BIT(17)
+
 /* IP-Mux feature */
 #define RMNET_INGRESS_FORMAT_IP_ROUTE           BIT(25)
 #define RMNET_EGRESS_FORMAT_IP_ROUTE            BIT(24)

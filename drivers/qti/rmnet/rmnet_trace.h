@@ -24,6 +24,24 @@
 /*****************************************************************************/
 /* Trace events for rmnet module */
 /*****************************************************************************/
+TRACE_EVENT(rmnet_xmit_skb,
+	TP_PROTO(struct sk_buff *skb),
+
+	TP_ARGS(skb),
+
+	TP_STRUCT__entry(
+		__string(dev_name, skb->dev->name)
+		__field(unsigned int, len)
+	),
+
+	TP_fast_assign(
+		__assign_str(dev_name, skb->dev->name);
+		__entry->len = skb->len;
+	),
+
+	TP_printk("dev_name=%s len=%u", __get_str(dev_name), __entry->len)
+);
+
 DECLARE_EVENT_CLASS(rmnet_skb_time_template,
 
 	TP_PROTO(struct sk_buff *skb),

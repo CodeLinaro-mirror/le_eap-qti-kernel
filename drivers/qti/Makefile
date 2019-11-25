@@ -8,3 +8,5 @@ obj-$(CONFIG_QTI_USB_F_DIAG)	+= usb_diag/
 obj-$(CONFIG_QTI_QMI_HELPERS)	+= qmi/
 obj-$(CONFIG_QTI_USB_KS_BRIDGE)	+= ks_bridge/
 obj-$(CONFIG_QTI_USB_MDM_DATA_BRIDGE)  += usb_mdm_data/
+obj-$(CONFIG_QTI_QMI_RMNET)	+= dfc/
+obj-$(CONFIG_QTI_RMNET_CTL)	+= rmnet_ctl/
