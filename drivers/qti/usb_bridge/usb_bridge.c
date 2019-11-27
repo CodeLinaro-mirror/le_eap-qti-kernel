@@ -328,10 +328,8 @@ remove_func:
 }
 
 static const struct usb_device_id ub_device_table[] = {
-	{ USB_DEVICE(USB_QTI_VENDOR_ID, 0x900E) },
-	{ USB_DEVICE(USB_QTI_VENDOR_ID, 0x901D) },
-	{ USB_DEVICE(USB_QTI_VENDOR_ID, 0x90EF) },
-	{ USB_DEVICE(USB_QTI_VENDOR_ID, 0x90F0) },
+	{ .match_flags = USB_DEVICE_ID_MATCH_VENDOR,
+        .idVendor = USB_QTI_VENDOR_ID },
 	{ } /* Terminating entry */
 };
 
