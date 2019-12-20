@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, 2016-2019 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014, 2016-2020 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -202,7 +202,8 @@ int rmnet_del_bridge(struct net_device *rmnet_dev,
 		     struct net_device *slave_dev);
 
 struct rmnet_endpoint *rmnet_get_ip6_route_endpoint(struct rmnet_port *port,
-						    struct in6_addr *addr);
+						    struct in6_addr *saddr,
+						    struct in6_addr *daddr);
 struct rmnet_endpoint *rmnet_get_ip4_route_endpoint(struct rmnet_port *port,
 						    __be32 *ifa_address);
 #endif /* _RMNET_CONFIG_H_ */
