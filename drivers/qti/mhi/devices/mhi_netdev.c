@@ -672,6 +672,7 @@ static void mhi_netdev_push_skb(struct mhi_netdev *mhi_netdev,
 				struct mhi_result *mhi_result)
 {
 	struct sk_buff *skb;
+	struct timespec64 now;
 
 	skb = alloc_skb(0, GFP_ATOMIC);
 	if (!skb) {
@@ -692,6 +693,11 @@ static void mhi_netdev_push_skb(struct mhi_netdev *mhi_netdev,
 			mhi_result->bytes_xferd, mhi_netdev->mru);
 
 		skb->protocol = mhi_netdev_ip_type_trans(*(u8 *)mhi_buf->buf);
+		if (!strncmp(mhi_netdev->ndev->name, "rmnet_mhi1", 10)) {
+			getnstimeofday64(&now);
+			MSG_LOG("%s-%s: skb %p time %lu.%lu\n", mhi_netdev->ndev->name,
+				mhi_netdev->interface_name,skb, now.tv_sec, now.tv_nsec);
+		}
 	}
 
 	netif_receive_skb(skb);
