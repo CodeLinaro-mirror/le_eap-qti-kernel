@@ -76,6 +76,7 @@ do_unpack_extra () {
         git apply ${WORKDIR}/eap-qti-kernel/patches-4.9/0004-net-rmnet_data-Add-snapshot-of-rmnet_data-driver.patch
         git apply ${WORKDIR}/eap-qti-kernel/patches-4.9/0005-net-ipv6-Generate-random-IID-for-addresses-on-RAWIP-.patch
         git apply ${WORKDIR}/eap-qti-kernel/patches-4.9/0006-Add-support-for-upstream-rmnet-driver.patch
+		git apply ${WORKDIR}/eap-qti-kernel/patches-4.9/0007-net-cdc_ether-Ensure-that-default-MTU-is-minimum-204.patch
         cd -
     elif [ "${@d.getVar('LINUX_VERSION')[0:4]}" = "4.14" ]; then
         cd ${S}
@@ -83,6 +84,7 @@ do_unpack_extra () {
         git apply ${WORKDIR}/eap-qti-kernel/patches-4.14/0002-net-Add-the-get-current-NAPI-context-API.patch
         git apply ${WORKDIR}/eap-qti-kernel/patches-4.14/0003-net-ipv6-Generate-random-IID-for-addresses-on-RAWIP-.patch
         git apply ${WORKDIR}/eap-qti-kernel/patches-4.14/0004-Add-support-for-upstream-rmnet-driver.patch
+		git apply ${WORKDIR}/eap-qti-kernel/patches-4.14/0005-net-cdc_ether-Ensure-that-default-MTU-is-minimum-204.patch
         cd -
     else
         bbfatal "Kernel version ${LINUX_VERSION} is not supported"
