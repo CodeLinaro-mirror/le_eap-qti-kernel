@@ -1055,9 +1055,15 @@ int mhi_process_data_event_ring(struct mhi_controller *mhi_cntrl,
 		MHI_VERB("Processing Event:0x%llx 0x%08x 0x%08x\n",
 			local_rp->ptr, local_rp->dword[0], local_rp->dword[1]);
 
+		chan = MHI_TRE_GET_EV_CHID(local_rp);
+		if (chan >= mhi_cntrl->max_chan) {
+			MHI_ERR("invalid channel id %u\n", chan);
+			continue;
+		}
+		mhi_chan = &mhi_cntrl->mhi_chan[chan];
+
 		if (likely(type == MHI_PKT_TYPE_TX_EVENT)) {
-			chan = MHI_TRE_GET_EV_CHID(local_rp);
-			mhi_chan = &mhi_cntrl->mhi_chan[chan];
+
 			parse_xfer_event(mhi_cntrl, local_rp, mhi_chan);
 			event_quota--;
 		}
