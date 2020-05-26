@@ -1,0 +1,54 @@
+From d2c01815f7886f493320b3752a38c2dd01255bee Mon Sep 17 00:00:00 2001
+From: Sanjay Dwivedi <sanjaykd@codeaurora.org>
+Date: Wed, 1 Jul 2020 14:50:17 +0530
+Subject: [PATCH] 005-Add-support-for-5.4-upstream-qrtr.patch
+
+Change-Id: I62dcdf368f9ebb8a620225c829936b6314ff1dd0
+---
+ drivers/qti/qrtr/qrtr.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/qti/qrtr/qrtr.c b/drivers/qti/qrtr/qrtr.c
+index 8857826..07da9f0 100644
+--- a/drivers/qti/qrtr/qrtr.c
++++ b/drivers/qti/qrtr/qrtr.c
+@@ -670,7 +670,7 @@ static void qrtr_node_assign(struct qrtr_node *node, unsigned int nid)
+ 	 * cause APPS suspend problems and power drain issue.
+ 	 */
+ 	if (!node->ws && nid == 0)
+-		node->ws = wakeup_source_register(name);
++		node->ws = wakeup_source_register(NULL, name);
+ }
+ 
+ /**
+@@ -1676,7 +1676,7 @@ static int qrtr_connect(struct socket *sock, struct sockaddr *saddr,
+ }
+ 
+ static int qrtr_getname(struct socket *sock, struct sockaddr *saddr,
+-			int *len, int peer)
++			int peer)
+ {
+ 	struct qrtr_sock *ipc = qrtr_sk(sock->sk);
+ 	struct sockaddr_qrtr qaddr;
+@@ -1695,7 +1695,6 @@ static int qrtr_getname(struct socket *sock, struct sockaddr *saddr,
+ 	}
+ 	release_sock(sk);
+ 
+-	*len = sizeof(qaddr);
+ 	qaddr.sq_family = AF_QIPCRTR;
+ 
+ 	memcpy(saddr, &qaddr, sizeof(qaddr));
+@@ -1743,7 +1742,9 @@ static int qrtr_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
+ 		}
+ 		break;
+ 	case SIOCGSTAMP:
+-		rc = sock_get_timestamp(sk, argp);
++		rc = sock->ops->gettstamp(sock, argp,
++				          0,
++					  !IS_ENABLED(CONFIG_64BIT));
+ 		break;
+ 	case SIOCADDRT:
+ 	case SIOCDELRT:
+-- 
+2.7.4
+

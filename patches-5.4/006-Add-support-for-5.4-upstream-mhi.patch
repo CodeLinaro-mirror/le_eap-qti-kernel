@@ -1,0 +1,25 @@
+From 5195d9eeffc2cd9c51fbfa1c27bf95057bcf8cab Mon Sep 17 00:00:00 2001
+From: Sanjay Dwivedi <sanjaykd@codeaurora.org>
+Date: Wed, 1 Jul 2020 14:50:17 +0530
+Subject: [PATCH] 006-Add-support-for-5.4-upstream-mhi.patch
+
+Change-Id: Ic539000b2f619cef05aaf04d824962e870ffb616
+---
+ drivers/qti/mhi/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/qti/mhi/Kconfig b/drivers/qti/mhi/Kconfig
+index e32e3cc..d899871 100644
+--- a/drivers/qti/mhi/Kconfig
++++ b/drivers/qti/mhi/Kconfig
+@@ -15,5 +15,5 @@ config QTI_MHI_DEBUG
+ 	  throughput as individual MHI packets and state transitions
+ 	  will be logged.
+ 
+-source drivers/qti/mhi/controllers/Kconfig
+-source drivers/qti/mhi/devices/Kconfig
++source "drivers/qti/mhi/controllers/Kconfig"
++source "drivers/qti/mhi/devices/Kconfig"
+-- 
+2.7.4
+

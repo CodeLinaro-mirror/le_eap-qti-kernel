@@ -86,6 +86,18 @@ do_unpack_extra () {
         git apply ${WORKDIR}/eap-qti-kernel/patches-4.14/0004-Add-support-for-upstream-rmnet-driver.patch
 		git apply ${WORKDIR}/eap-qti-kernel/patches-4.14/0005-net-cdc_ether-Ensure-that-default-MTU-is-minimum-204.patch
         cd -
+    elif [ "${@d.getVar('LINUX_VERSION')[0:3]}" = "5.4" ]; then
+        cd ${S}
+	sed -e '/PCIe/,+7d' ${WORKDIR}/eap-qti-kernel/defconfig -i ${WORKDIR}/eap-qti-kernel/defconfig
+	git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/001-Add-support-for-5.4-upstream-daig-driver.patch
+	git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/002-Add-support-for-5.4-upstream-usb-mdm-data.patch
+	git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/003-Add-support-for-5.4-upstream-rmnet-driver.patch
+	git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/004-Add-support-for-5.4-upstream-ks-bridge.patch
+	git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/005-Add-support-for-5.4-upstream-qrtr.patch
+	git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/006-Add-support-for-5.4-upstream-mhi.patch
+	git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/007-Add-support-for-5.4-upstream-qmi.patch
+	git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/008-Add-support-for-kernel-API-used-in-daig-and-mhi.patch
+	cd -
     else
         bbfatal "Kernel version ${LINUX_VERSION} is not supported"
     fi

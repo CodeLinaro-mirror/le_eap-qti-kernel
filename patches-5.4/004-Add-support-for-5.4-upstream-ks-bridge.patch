@@ -1,0 +1,34 @@
+From 6676761b63779edc8d4c078b36b08d365d4b86ce Mon Sep 17 00:00:00 2001
+From: Sanjay Dwivedi <sanjaykd@codeaurora.org>
+Date: Wed, 1 Jul 2020 14:50:16 +0530
+Subject: [PATCH] 004-Add-support-for-5.4-upstream-ks-bridge.patch
+
+Change-Id: Ifbacb9d2debb0394157c6ccacfea2c32911d2d44
+---
+ drivers/qti/ks_bridge/ks_bridge.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/qti/ks_bridge/ks_bridge.c b/drivers/qti/ks_bridge/ks_bridge.c
+index da71781..e5986bd 100644
+--- a/drivers/qti/ks_bridge/ks_bridge.c
++++ b/drivers/qti/ks_bridge/ks_bridge.c
+@@ -94,13 +94,13 @@ module_param(prevent_edl_probe, bool, 0644);
+ /*get_timestamp - returns time of day in us */
+ static unsigned int get_timestamp(void)
+ {
+-	struct timeval	tval;
++	struct timespec64 tval;
+ 	unsigned int	stamp;
+ 
+-	do_gettimeofday(&tval);
++	ktime_get_raw_ts64(&tval);
+ 	/* 2^32 = 4294967296. Limit to 4096s. */
+ 	stamp = tval.tv_sec & 0xFFF;
+-	stamp = stamp * 1000000 + tval.tv_usec;
++	stamp = stamp * 1000000000 + tval.tv_nsec;
+ 	return stamp;
+ }
+ 
+-- 
+2.7.4
+

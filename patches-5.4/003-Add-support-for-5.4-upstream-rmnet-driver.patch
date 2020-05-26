@@ -1,0 +1,246 @@
+From e4941f1362baf315d83d49e2a97f252a0783d8fa Mon Sep 17 00:00:00 2001
+From: Sanjay Dwivedi <sanjaykd@codeaurora.org>
+Date: Wed, 1 Jul 2020 14:50:17 +0530
+Subject: [PATCH] 003-Add-support-for-5.4-upstream-rmnet-driver.patch
+
+Change-Id: Ic34ff31f7b0251160378711f49d68e0c35a0c55d
+---
+ drivers/qti/rmnet/rmnet_config.c     |  3 ++-
+ drivers/qti/rmnet/rmnet_config.h     |  7 ++++---
+ drivers/qti/rmnet/rmnet_descriptor.c |  8 ++++----
+ drivers/qti/rmnet/rmnet_descriptor.h |  4 ++--
+ drivers/qti/rmnet/rmnet_handlers.h   |  8 ++++++++
+ drivers/qti/rmnet/rmnet_map_data.c   | 26 ++++++++++++++++----------
+ drivers/qti/rmnet/rmnet_vnd.c        |  3 +--
+ 7 files changed, 37 insertions(+), 22 deletions(-)
+
+diff --git a/drivers/qti/rmnet/rmnet_config.c b/drivers/qti/rmnet/rmnet_config.c
+index 48409fe..52d15a7 100644
+--- a/drivers/qti/rmnet/rmnet_config.c
++++ b/drivers/qti/rmnet/rmnet_config.c
+@@ -517,7 +517,8 @@ struct rmnet_endpoint *rmnet_get_endpoint(struct rmnet_port *port, u8 mux_id)
+ EXPORT_SYMBOL(rmnet_get_endpoint);
+ 
+ int rmnet_add_bridge(struct net_device *rmnet_dev,
+-		     struct net_device *slave_dev)
++		     struct net_device *slave_dev,
++		     struct netlink_ext_ack *extack)
+ {
+ 	struct rmnet_priv *priv = netdev_priv(rmnet_dev);
+ 	struct net_device *real_dev = priv->real_dev;
+diff --git a/drivers/qti/rmnet/rmnet_config.h b/drivers/qti/rmnet/rmnet_config.h
+index 2eb0552..02be619 100644
+--- a/drivers/qti/rmnet/rmnet_config.h
++++ b/drivers/qti/rmnet/rmnet_config.h
+@@ -90,8 +90,8 @@ struct rmnet_port {
+ 	struct sk_buff *agg_skb;
+ 	int agg_state;
+ 	u8 agg_count;
+-	struct timespec agg_time;
+-	struct timespec agg_last;
++	struct timespec64 agg_time;
++	struct timespec64 agg_last;
+ 	struct hrtimer hrtimer;
+ 	struct work_struct agg_wq;
+ 	u8 agg_size_order;
+@@ -197,7 +197,8 @@ int rmnet_is_real_dev_registered(const struct net_device *real_dev);
+ struct rmnet_port *rmnet_get_port(struct net_device *real_dev);
+ struct rmnet_endpoint *rmnet_get_endpoint(struct rmnet_port *port, u8 mux_id);
+ int rmnet_add_bridge(struct net_device *rmnet_dev,
+-		     struct net_device *slave_dev);
++		     struct net_device *slave_dev,
++		     struct netlink_ext_ack *extack);
+ int rmnet_del_bridge(struct net_device *rmnet_dev,
+ 		     struct net_device *slave_dev);
+ 
+diff --git a/drivers/qti/rmnet/rmnet_descriptor.c b/drivers/qti/rmnet/rmnet_descriptor.c
+index f611e36..9d10e35 100644
+--- a/drivers/qti/rmnet/rmnet_descriptor.c
++++ b/drivers/qti/rmnet/rmnet_descriptor.c
+@@ -383,7 +383,7 @@ void rmnet_frag_deaggregate(skb_frag_t *frag, struct rmnet_port *port,
+ 			return;
+ 
+ 		rmnet_descriptor_add_frag(port, list, skb_frag_page(frag),
+-					  frag->page_offset + offset,
++					  frag->bv_offset + offset,
+ 					  packet_len);
+ 
+ 		offset += packet_len;
+@@ -508,7 +508,7 @@ static struct sk_buff *rmnet_alloc_skb(struct rmnet_frag_descriptor *frag_desc,
+ 	/* Add main fragment */
+ 	get_page(skb_frag_page(&frag_desc->frag));
+ 	skb_add_rx_frag(head_skb, 0, skb_frag_page(&frag_desc->frag),
+-			frag_desc->frag.page_offset,
++			frag_desc->frag.bv_offset,
+ 			skb_frag_size(&frag_desc->frag),
+ 			skb_frag_size(&frag_desc->frag));
+ 
+@@ -527,7 +527,7 @@ add_frag:
+ 		if (shinfo->nr_frags < MAX_SKB_FRAGS) {
+ 			get_page(skb_frag_page(frag));
+ 			skb_add_rx_frag(current_skb, shinfo->nr_frags,
+-					skb_frag_page(frag), frag->page_offset,
++					skb_frag_page(frag), frag->bv_offset,
+ 					frag_size, frag_size);
+ 			if (current_skb != head_skb) {
+ 				head_skb->len += frag_size;
+@@ -679,7 +679,7 @@ static void __rmnet_frag_segment_data(struct rmnet_frag_descriptor *coal_desc,
+ 		return;
+ 
+ 	/* Account for header lengths to access the data start */
+-	offset = coal_desc->frag.page_offset + coal_desc->ip_len +
++	offset = coal_desc->frag.bv_offset + coal_desc->ip_len +
+ 		 coal_desc->trans_len + coal_desc->data_offset;
+ 
+ 	/* Header information and most metadata is the same as the original */
+diff --git a/drivers/qti/rmnet/rmnet_descriptor.h b/drivers/qti/rmnet/rmnet_descriptor.h
+index 795f6f2..99dd59d 100644
+--- a/drivers/qti/rmnet/rmnet_descriptor.h
++++ b/drivers/qti/rmnet/rmnet_descriptor.h
+@@ -98,7 +98,7 @@ static inline void *rmnet_frag_pull(struct rmnet_frag_descriptor *frag_desc,
+ 		return NULL;
+ 	}
+ 
+-	frag_desc->frag.page_offset += size;
++	frag_desc->frag.bv_offset += size;
+ 	skb_frag_size_sub(&frag_desc->frag, size);
+ 
+ 	return rmnet_frag_data_ptr(frag_desc);
+@@ -127,7 +127,7 @@ static inline void rmnet_frag_fill(struct rmnet_frag_descriptor *frag_desc,
+ 	get_page(p);
+ 	__skb_frag_set_page(&frag_desc->frag, p);
+ 	skb_frag_size_set(&frag_desc->frag, len);
+-	frag_desc->frag.page_offset = page_offset;
++	frag_desc->frag.bv_offset = page_offset;
+ }
+ 
+ static inline u8
+diff --git a/drivers/qti/rmnet/rmnet_handlers.h b/drivers/qti/rmnet/rmnet_handlers.h
+index 36a7c76..30b54fc 100644
+--- a/drivers/qti/rmnet/rmnet_handlers.h
++++ b/drivers/qti/rmnet/rmnet_handlers.h
+@@ -18,6 +18,14 @@
+ 
+ #include "rmnet_config.h"
+ 
++#define RMNET_FLAGS_INGRESS_DEAGGREGATION         (1U << 0)
++#define RMNET_FLAGS_INGRESS_MAP_COMMANDS          (1U << 1) 
++#define RMNET_FLAGS_INGRESS_MAP_CKSUMV4           (1U << 2)
++#define RMNET_FLAGS_EGRESS_MAP_CKSUMV4            (1U << 3)
++#define RMNET_FLAGS_INGRESS_COALESCE              (1U << 4)
++#define RMNET_FLAGS_INGRESS_MAP_CKSUMV5           (1U << 5)
++#define RMNET_FLAGS_EGRESS_MAP_CKSUMV5            (1U << 6)
++
+ enum rmnet_packet_context {
+ 	RMNET_NET_RX_CTX,
+ 	RMNET_WQ_CTX,
+diff --git a/drivers/qti/rmnet/rmnet_map_data.c b/drivers/qti/rmnet/rmnet_map_data.c
+index f853c71..e849600 100644
+--- a/drivers/qti/rmnet/rmnet_map_data.c
++++ b/drivers/qti/rmnet/rmnet_map_data.c
+@@ -17,6 +17,7 @@
+ #include <linux/ip.h>
+ #include <linux/ipv6.h>
+ #include <linux/version.h>
++#include <linux/timekeeping.h>
+ #include <net/ip6_checksum.h>
+ #include "rmnet_config.h"
+ #include "rmnet_map.h"
+@@ -395,7 +396,7 @@ struct sk_buff *rmnet_map_deaggregate(struct sk_buff *skb,
+ 		if (!skbn)
+ 			return NULL;
+ 
+-		skb_append_pagefrags(skbn, page, frag0->page_offset,
++		skb_append_pagefrags(skbn, page, frag0->bv_offset,
+ 				     packet_len);
+ 		skbn->data_len += packet_len;
+ 		skbn->len += packet_len;
+@@ -658,7 +659,7 @@ static void rmnet_map_nonlinear_copy(struct sk_buff *coal_skb,
+ 		struct page *page = skb_frag_page(frag0);
+ 
+ 		skb_append_pagefrags(dest, page,
+-				     frag0->page_offset + coal_meta->ip_len +
++				     frag0->bv_offset + coal_meta->ip_len +
+ 				     coal_meta->trans_len +
+ 				     coal_meta->data_offset,
+ 				     copy_len);
+@@ -1406,21 +1407,24 @@ static struct sk_buff *rmnet_map_build_skb(struct rmnet_port *port)
+ 
+ void rmnet_map_tx_aggregate(struct sk_buff *skb, struct rmnet_port *port)
+ {
+-	struct timespec diff, last;
++	struct timespec64 diff, last;
++	struct timespec temp;
+ 	int size, agg_count = 0;
+ 	struct sk_buff *agg_skb;
+ 	unsigned long flags;
+ 
+ new_packet:
+ 	spin_lock_irqsave(&port->agg_lock, flags);
+-	memcpy(&last, &port->agg_last, sizeof(struct timespec));
+-	getnstimeofday(&port->agg_last);
++	memcpy(&last, &port->agg_last, sizeof(struct timespec64));
++	getnstimeofday(&temp);
++	port->agg_last.tv_sec = temp.tv_sec;
++	port->agg_last.tv_nsec = temp.tv_nsec;
+ 
+ 	if (!port->agg_skb) {
+ 		/* Check to see if we should agg first. If the traffic is very
+ 		 * sparse, don't aggregate. We will need to tune this later
+ 		 */
+-		diff = timespec_sub(port->agg_last, last);
++		diff = timespec64_sub(port->agg_last, last);
+ 		size = port->egress_agg_params.agg_size - skb->len;
+ 
+ 		if (diff.tv_sec > 0 || diff.tv_nsec > rmnet_agg_bypass_time ||
+@@ -1435,7 +1439,7 @@ new_packet:
+ 		if (!port->agg_skb) {
+ 			port->agg_skb = 0;
+ 			port->agg_count = 0;
+-			memset(&port->agg_time, 0, sizeof(struct timespec));
++			memset(&port->agg_time, 0, sizeof(struct timespec64));
+ 			spin_unlock_irqrestore(&port->agg_lock, flags);
+ 			skb->protocol = htons(ETH_P_MAP);
+ 			dev_queue_xmit(skb);
+@@ -1445,11 +1449,13 @@ new_packet:
+ 		port->agg_skb->dev = skb->dev;
+ 		port->agg_skb->protocol = htons(ETH_P_MAP);
+ 		port->agg_count = 1;
+-		getnstimeofday(&port->agg_time);
++		getnstimeofday(&temp);
++		port->agg_last.tv_sec = temp.tv_sec;
++		port->agg_last.tv_nsec = temp.tv_nsec;
+ 		dev_kfree_skb_any(skb);
+ 		goto schedule;
+ 	}
+-	diff = timespec_sub(port->agg_last, port->agg_time);
++	diff = timespec64_sub(port->agg_last, port->agg_time);
+ 	size = port->egress_agg_params.agg_size - port->agg_skb->len;
+ 
+ 	if (skb->len > size ||
+@@ -1459,7 +1465,7 @@ new_packet:
+ 		agg_count = port->agg_count;
+ 		port->agg_skb = 0;
+ 		port->agg_count = 0;
+-		memset(&port->agg_time, 0, sizeof(struct timespec));
++		memset(&port->agg_time, 0, sizeof(struct timespec64));
+ 		port->agg_state = 0;
+ 		spin_unlock_irqrestore(&port->agg_lock, flags);
+ 		hrtimer_cancel(&port->hrtimer);
+diff --git a/drivers/qti/rmnet/rmnet_vnd.c b/drivers/qti/rmnet/rmnet_vnd.c
+index a5ff647..681532b 100644
+--- a/drivers/qti/rmnet/rmnet_vnd.c
++++ b/drivers/qti/rmnet/rmnet_vnd.c
+@@ -174,8 +174,7 @@ static void rmnet_get_stats64(struct net_device *dev,
+ 
+ static u16 rmnet_vnd_select_queue(struct net_device *dev,
+ 				  struct sk_buff *skb,
+-				  void *accel_priv,
+-				  select_queue_fallback_t fallback)
++			          struct net_device *sb_dev)
+ {
+ 	struct rmnet_priv *priv = netdev_priv(dev);
+ 	int txq = 0;
+-- 
+2.7.4
+

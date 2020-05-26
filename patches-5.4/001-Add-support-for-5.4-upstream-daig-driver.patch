@@ -1,0 +1,299 @@
+From 29851aed4149be6a5362236af19a92e93b453df8 Mon Sep 17 00:00:00 2001
+From: Sanjay Dwivedi <sanjaykd@codeaurora.org>
+Date: Wed, 1 Jul 2020 14:50:16 +0530
+Subject: [PATCH] 001-Add-support-for-5.4-upstream-daig-driver.patch
+
+Change-Id: I58fd52d9d9d4cce08c2d416aaea1bf88ed12f84f
+---
+ drivers/qti/diag/diag_dci.c          | 12 ++++++------
+ drivers/qti/diag/diag_dci.h          |  2 +-
+ drivers/qti/diag/diag_memorydevice.c |  2 +-
+ drivers/qti/diag/diag_mux.c          |  1 +
+ drivers/qti/diag/diagchar_core.c     | 19 ++++++++++---------
+ drivers/qti/diag/diagfwd.c           |  8 ++++----
+ drivers/qti/diag/diagfwd.h           |  2 +-
+ drivers/qti/diag/diagfwd_cntl.c      |  2 +-
+ drivers/qti/diag/diagfwd_hsic.c      |  1 +
+ drivers/qti/diag/diagfwd_socket.c    |  6 +++---
+ 10 files changed, 29 insertions(+), 26 deletions(-)
+
+diff --git a/drivers/qti/diag/diag_dci.c b/drivers/qti/diag/diag_dci.c
+index 4048069..7ee7b86 100644
+--- a/drivers/qti/diag/diag_dci.c
++++ b/drivers/qti/diag/diag_dci.c
+@@ -195,7 +195,7 @@ static void create_dci_event_mask_tbl(unsigned char *tbl_buf)
+ 		memset(tbl_buf, 0, DCI_EVENT_MASK_SIZE);
+ }
+ 
+-void dci_drain_data(unsigned long data)
++void dci_drain_data(struct timer_list *t_list)
+ {
+ 	queue_work(driver->diag_dci_wq, &dci_data_drain_work);
+ }
+@@ -246,9 +246,9 @@ static void dci_handshake_work_fn(struct work_struct *work)
+ 		  jiffies + msecs_to_jiffies(DCI_HANDSHAKE_WAIT_TIME));
+ }
+ 
+-static void dci_chk_handshake(unsigned long data)
++static void dci_chk_handshake(struct timer_list *t_list)
+ {
+-	int index = (int)data;
++	int index = t_list->expires;
+ 
+ 	if (index < 0 || index >= NUM_DCI_PROC)
+ 		return;
+@@ -1537,7 +1537,7 @@ void diag_dci_channel_open_work(struct work_struct *work)
+ void diag_dci_notify_client(int peripheral_mask, int data, int proc)
+ {
+ 	int stat = 0;
+-	struct siginfo info;
++	struct kernel_siginfo info;
+ 	struct list_head *start, *temp;
+ 	struct diag_dci_client_tbl *entry = NULL;
+ 	struct pid *pid_struct = NULL;
+@@ -2781,7 +2781,7 @@ static void diag_dci_init_handshake_remote(void)
+ 		temp = &dci_channel_status[i];
+ 		temp->id = i;
+ 		INIT_WORK(&temp->handshake_work, dci_handshake_work_fn);
+-		setup_timer(&temp->wait_time, dci_chk_handshake, i);
++		timer_setup(&temp->wait_time, dci_chk_handshake, 0);
+ 	}
+ }
+ 
+@@ -2863,7 +2863,7 @@ int diag_dci_init(void)
+ 
+ 	INIT_WORK(&dci_data_drain_work, dci_data_drain_work_fn);
+ 
+-	setup_timer(&dci_drain_timer, dci_drain_data, 0);
++	timer_setup(&dci_drain_timer, dci_drain_data, 0);
+ 	return DIAG_DCI_NO_ERROR;
+ err:
+ 	pr_err("diag: Could not initialize diag DCI buffers");
+diff --git a/drivers/qti/diag/diag_dci.h b/drivers/qti/diag/diag_dci.h
+index 72f0b92..608f2a1 100644
+--- a/drivers/qti/diag/diag_dci.h
++++ b/drivers/qti/diag/diag_dci.h
+@@ -313,7 +313,7 @@ int diag_dci_set_real_time(struct diag_dci_client_tbl *entry,
+ 			   uint8_t real_time);
+ int diag_dci_copy_health_stats(struct diag_dci_health_stats_proc *stats_proc);
+ int diag_dci_write_proc(uint8_t peripheral, int pkt_type, char *buf, int len);
+-void dci_drain_data(unsigned long data);
++void dci_drain_data(struct timer_list *t_list);
+ 
+ #ifdef CONFIG_QTI_DIAGFWD_BRIDGE_CODE
+ int diag_send_dci_log_mask_remote(int token);
+diff --git a/drivers/qti/diag/diag_memorydevice.c b/drivers/qti/diag/diag_memorydevice.c
+index 1b405b5..b600d03 100644
+--- a/drivers/qti/diag/diag_memorydevice.c
++++ b/drivers/qti/diag/diag_memorydevice.c
+@@ -175,7 +175,7 @@ int diag_md_write(int id, unsigned char *buf, int len, int ctx)
+ {
+ 	int i, peripheral, pid = 0;
+ 	uint8_t found = 0;
+-	unsigned long flags, flags_sec;
++	unsigned long flags, flags_sec = 0;
+ 	struct diag_md_info *ch = NULL;
+ 	struct diag_md_session_t *session_info = NULL;
+ 
+diff --git a/drivers/qti/diag/diag_mux.c b/drivers/qti/diag/diag_mux.c
+index 772889f..2b4ca6a 100644
+--- a/drivers/qti/diag/diag_mux.c
++++ b/drivers/qti/diag/diag_mux.c
+@@ -22,6 +22,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/spinlock.h>
+ #include <linux/ratelimit.h>
++#include <linux/kmemleak.h>
+ #include "diagchar.h"
+ #include "diagfwd.h"
+ #include "diag_mux.h"
+diff --git a/drivers/qti/diag/diagchar_core.c b/drivers/qti/diag/diagchar_core.c
+index 2967fde..a40632d 100644
+--- a/drivers/qti/diag/diagchar_core.c
++++ b/drivers/qti/diag/diagchar_core.c
+@@ -22,6 +22,7 @@
+ #include <linux/sched.h>
+ #include <linux/ratelimit.h>
+ #include <linux/timer.h>
++#include <linux/kmemleak.h>
+ #include <linux/version.h>
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0))
+ #include <linux/sched/task.h>
+@@ -206,7 +207,7 @@ do {								\
+ 	ret += length;						\
+ } while (0)
+ 
+-static void drain_timer_func(unsigned long data)
++static void drain_timer_func(struct timer_list *t_list)
+ {
+ 	queue_work(driver->diag_wq, &(driver->diag_drain_work));
+ }
+@@ -656,15 +657,15 @@ void diag_record_stats(int type, int flag)
+ 
+ void diag_get_timestamp(char *time_str)
+ {
+-	struct timeval t;
++	struct timespec64 t;
+ 	struct tm broken_tm;
+ 
+-	do_gettimeofday(&t);
++	ktime_get_raw_ts64(&t);
+ 	if (!time_str)
+ 		return;
+-	time_to_tm(t.tv_sec, 0, &broken_tm);
++	time64_to_tm(t.tv_sec, 0, &broken_tm);
+ 	scnprintf(time_str, DIAG_TS_SIZE, "%d:%d:%d:%ld", broken_tm.tm_hour,
+-				broken_tm.tm_min, broken_tm.tm_sec, t.tv_usec);
++				broken_tm.tm_min, broken_tm.tm_sec, t.tv_nsec);
+ }
+ 
+ int diag_get_remote(int remote_info)
+@@ -1405,9 +1406,9 @@ int diag_md_session_create(int mode, int peripheral_mask, int proc)
+ 		driver->md_session_map[proc][i] = new_session;
+ 		driver->md_session_mask[proc] |= MD_PERIPHERAL_MASK(i);
+ 	}
+-	setup_timer(&new_session->hdlc_reset_timer,
++	timer_setup(&new_session->hdlc_reset_timer,
+ 		diag_md_hdlc_reset_timer_func,
+-		new_session->pid);
++		0);
+ 
+ 	driver->md_session_mode[proc] = DIAG_MD_PERIPHERAL;
+ 	mutex_unlock(&driver->md_session_lock);
+@@ -4287,7 +4288,7 @@ static int diagchar_setup_cdev(dev_t devno)
+ 	if (!driver->diag_dev)
+ 		return -EIO;
+ 
+-	driver->diag_dev->power.wakeup = wakeup_source_register("DIAG_WS");
++	driver->diag_dev->power.wakeup = wakeup_source_register(driver->diag_dev, "DIAG_WS");
+ 	return 0;
+ 
+ }
+@@ -4367,7 +4368,7 @@ static int __init diagchar_init(void)
+ 	driver->delayed_rsp_id = 0;
+ 	driver->hdlc_disabled = 0;
+ 	driver->dci_state = DIAG_DCI_NO_ERROR;
+-	setup_timer(&drain_timer, drain_timer_func, 1234);
++	timer_setup(&drain_timer, drain_timer_func, 0);
+ 	driver->supports_sockets = 1;
+ 	driver->time_sync_enabled = 0;
+ 	driver->uses_time_api = 0;
+diff --git a/drivers/qti/diag/diagfwd.c b/drivers/qti/diag/diagfwd.c
+index 69a3e68..400a236 100644
+--- a/drivers/qti/diag/diagfwd.c
++++ b/drivers/qti/diag/diagfwd.c
+@@ -1550,7 +1550,7 @@ static void diag_md_timer_work_fn(struct work_struct *work)
+ 	mutex_unlock(&driver->hdlc_disable_mutex);
+ }
+ 
+-static void hdlc_reset_timer_func(unsigned long data)
++static void hdlc_reset_timer_func(struct timer_list *t_list)
+ {
+ 	pr_debug("diag: In %s, re-enabling HDLC encoding\n",
+ 		       __func__);
+@@ -1562,7 +1562,7 @@ static void hdlc_reset_timer_func(unsigned long data)
+ 	hdlc_timer_in_progress = 0;
+ }
+ 
+-void diag_md_hdlc_reset_timer_func(unsigned long pid)
++void diag_md_hdlc_reset_timer_func(struct timer_list *t_list)
+ {
+ 	struct diag_md_hdlc_reset_work *hdlc_reset_work = NULL;
+ 
+@@ -1576,7 +1576,7 @@ void diag_md_hdlc_reset_timer_func(unsigned long pid)
+ 		return;
+ 	}
+ 	if (hdlc_reset) {
+-		hdlc_reset_work->pid = pid;
++		//hdlc_reset_work->pid = pid;
+ 		INIT_WORK(&hdlc_reset_work->work, diag_md_timer_work_fn);
+ 		queue_work(driver->diag_wq, &(hdlc_reset_work->work));
+ 		queue_work(driver->diag_wq, &(driver->update_md_clients));
+@@ -1914,7 +1914,7 @@ int diagfwd_init(void)
+ 			      GFP_KERNEL);
+ 	if (!hdlc_decode)
+ 		goto err;
+-	setup_timer(&driver->hdlc_reset_timer, hdlc_reset_timer_func, 0);
++	timer_setup(&driver->hdlc_reset_timer, hdlc_reset_timer_func, 0);
+ 	kmemleak_not_leak(hdlc_decode);
+ 	driver->encoded_rsp_len = 0;
+ 	driver->rsp_buf_busy = 0;
+diff --git a/drivers/qti/diag/diagfwd.h b/drivers/qti/diag/diagfwd.h
+index 7153f08..93c9e2e 100644
+--- a/drivers/qti/diag/diagfwd.h
++++ b/drivers/qti/diag/diagfwd.h
+@@ -47,7 +47,7 @@ int diag_process_apps_pkt(unsigned char *buf, int len, int pid);
+ void diag_send_error_rsp(unsigned char *buf, int len, int pid);
+ void diag_update_pkt_buffer(unsigned char *buf, uint32_t len, int type);
+ int diag_process_stm_cmd(unsigned char *buf, int len, unsigned char *dest_buf);
+-void diag_md_hdlc_reset_timer_func(unsigned long pid);
++void diag_md_hdlc_reset_timer_func(struct timer_list *);
+ void diag_update_md_clients(unsigned int type);
+ void diag_update_md_clients_proc(unsigned int proc, unsigned int type);
+ #endif
+diff --git a/drivers/qti/diag/diagfwd_cntl.c b/drivers/qti/diag/diagfwd_cntl.c
+index 04f0522..8eea5d1 100644
+--- a/drivers/qti/diag/diagfwd_cntl.c
++++ b/drivers/qti/diag/diagfwd_cntl.c
+@@ -113,7 +113,7 @@ static void diag_stm_update_work_fn(struct work_struct *work)
+ void diag_notify_md_client(uint8_t peripheral, int data)
+ {
+ 	int stat = 0, proc = DIAG_LOCAL_PROC;
+-	struct siginfo info;
++	struct kernel_siginfo info;
+ 	struct pid *pid_struct;
+ 	struct task_struct *result;
+ 
+diff --git a/drivers/qti/diag/diagfwd_hsic.c b/drivers/qti/diag/diagfwd_hsic.c
+index 78d5cc1..b5f6f91 100644
+--- a/drivers/qti/diag/diagfwd_hsic.c
++++ b/drivers/qti/diag/diagfwd_hsic.c
+@@ -20,6 +20,7 @@
+ #include <linux/workqueue.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/platform_device.h>
++#include <linux/kmemleak.h>
+ #include <asm/current.h>
+ #include "diagmem.h"
+ #include "diagfwd_bridge.h"
+diff --git a/drivers/qti/diag/diagfwd_socket.c b/drivers/qti/diag/diagfwd_socket.c
+index db09d80..2e1bb43 100644
+--- a/drivers/qti/diag/diagfwd_socket.c
++++ b/drivers/qti/diag/diagfwd_socket.c
+@@ -28,6 +28,7 @@
+ #include <linux/notifier.h>
+ #include <linux/qrtr.h>
+ #include <linux/termios.h>
++#include <linux/soc/qcom/qmi.h>
+ #include "diagchar.h"
+ #include "diagfwd.h"
+ #include "diagfwd_peripheral.h"
+@@ -366,7 +367,6 @@ static void socket_open_server(struct diag_socket_info *info)
+ 	struct msghdr msg = {0};
+ 	struct kvec iv = { &pkt, sizeof(pkt) };
+ 	int ret;
+-	int sl = sizeof(sq);
+ 	unsigned int size = DIAG_SO_RCVBUF_SIZE;
+ 
+ 	if (!info || info->port_type != PORT_TYPE_SERVER)
+@@ -378,7 +378,7 @@ static void socket_open_server(struct diag_socket_info *info)
+ 		       info->name);
+ 		return;
+ 	}
+-	ret = kernel_getsockname(info->hdl, (struct sockaddr *)&sq, &sl);
++	ret = kernel_getsockname(info->hdl, (struct sockaddr *)&sq);
+ 	if (ret < 0) {
+ 		pr_err("diag: In %s, getsockname failed %d\n", __func__,
+ 		       ret);
+@@ -438,7 +438,7 @@ static void __socket_close_channel(struct diag_socket_info *info)
+ 	sock_release(info->hdl);
+ 	info->hdl = NULL;
+ 	mutex_unlock(&info->socket_info_mutex);
+-	cancel_work(&info->read_work);
++	cancel_work_sync(&info->read_work);
+ 	wake_up_interruptible(&info->read_wait_q);
+ 
+ 	spin_lock_irqsave(&info->lock, flags);
+-- 
+2.7.4
+

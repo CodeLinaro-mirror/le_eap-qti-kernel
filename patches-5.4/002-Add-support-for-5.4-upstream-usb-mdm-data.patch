@@ -1,0 +1,62 @@
+From 5357703fbc59b3c7e21f1fee41a0419598e3a93a Mon Sep 17 00:00:00 2001
+From: Sanjay Dwivedi <sanjaykd@codeaurora.org>
+Date: Wed, 1 Jul 2020 14:50:16 +0530
+Subject: [PATCH] 002-Add-support-for-5.4-upstream-usb-mdm-data.patch
+
+Change-Id: Ie7ad666abba8b86bd79307e910598b1fe2f92a9f
+---
+ drivers/qti/usb_mdm_data/f_mdm_data.c      | 6 +++---
+ drivers/qti/usb_mdm_data/mdm_data_bridge.c | 6 +++---
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/qti/usb_mdm_data/f_mdm_data.c b/drivers/qti/usb_mdm_data/f_mdm_data.c
+index 0273000..d7e713b 100644
+--- a/drivers/qti/usb_mdm_data/f_mdm_data.c
++++ b/drivers/qti/usb_mdm_data/f_mdm_data.c
+@@ -869,16 +869,16 @@ static struct timestamp_buf dbg_data = {
+ /*get_timestamp - returns time of day in us */
+ static unsigned int get_timestamp(void)
+ {
+-	struct timeval	tval;
++	struct timespec64 tval;
+ 	unsigned int	stamp;
+ 
+ 	if (!record_timestamp)
+ 		return 0;
+ 
+-	do_gettimeofday(&tval);
++	ktime_get_raw_ts64(&tval);
+ 	/* 2^32 = 4294967296. Limit to 4096s. */
+ 	stamp = tval.tv_sec & 0xFFF;
+-	stamp = stamp * 1000000 + tval.tv_usec;
++	stamp = stamp * 1000000000 + tval.tv_nsec;
+ 	return stamp;
+ }
+ 
+diff --git a/drivers/qti/usb_mdm_data/mdm_data_bridge.c b/drivers/qti/usb_mdm_data/mdm_data_bridge.c
+index 391461a..1b9bb72 100644
+--- a/drivers/qti/usb_mdm_data/mdm_data_bridge.c
++++ b/drivers/qti/usb_mdm_data/mdm_data_bridge.c
+@@ -620,16 +620,16 @@ static struct timestamp_buf dbg_data = {
+ /*get_timestamp - returns time of day in us */
+ static unsigned int get_timestamp(void)
+ {
+-	struct timeval	tval;
++	struct timespec64	tval;
+ 	unsigned int	stamp;
+ 
+ 	if (!record_timestamp)
+ 		return 0;
+ 
+-	do_gettimeofday(&tval);
++	ktime_get_raw_ts64(&tval);
+ 	/* 2^32 = 4294967296. Limit to 4096s. */
+ 	stamp = tval.tv_sec & 0xFFF;
+-	stamp = stamp * 1000000 + tval.tv_usec;
++	stamp = stamp * 1000000000 + tval.tv_nsec;
+ 	return stamp;
+ }
+ 
+-- 
+2.7.4
+

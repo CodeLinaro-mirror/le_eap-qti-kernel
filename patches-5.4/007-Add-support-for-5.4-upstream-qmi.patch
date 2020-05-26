@@ -1,0 +1,34 @@
+From 1098d455bf1435b19b5cf42ab8940ba3b3e968ae Mon Sep 17 00:00:00 2001
+From: Sanjay Dwivedi <sanjaykd@codeaurora.org>
+Date: Wed, 1 Jul 2020 14:50:16 +0530
+Subject: [PATCH] 007-Add-support-for-5.4-upstream-qmi.patch
+
+Change-Id: I801831fe94ee9ba9b77d153c929e17ea56570af8
+---
+ drivers/qti/qmi/qmi_interface.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/qti/qmi/qmi_interface.c b/drivers/qti/qmi/qmi_interface.c
+index 901e7bf..12e137c 100644
+--- a/drivers/qti/qmi/qmi_interface.c
++++ b/drivers/qti/qmi/qmi_interface.c
+@@ -594,7 +594,6 @@ static struct socket *qmi_sock_create(struct qmi_handle *qmi,
+ 				      struct sockaddr_qrtr *sq)
+ {
+ 	struct socket *sock;
+-	int sl = sizeof(*sq);
+ 	int ret;
+ 
+ 	ret = sock_create_kern(&init_net, AF_QIPCRTR, SOCK_DGRAM,
+@@ -602,7 +601,7 @@ static struct socket *qmi_sock_create(struct qmi_handle *qmi,
+ 	if (ret < 0)
+ 		return ERR_PTR(ret);
+ 
+-	ret = kernel_getsockname(sock, (struct sockaddr *)sq, &sl);
++	ret = kernel_getsockname(sock, (struct sockaddr *)sq);
+ 	if (ret < 0) {
+ 		sock_release(sock);
+ 		return ERR_PTR(ret);
+-- 
+2.7.4
+
