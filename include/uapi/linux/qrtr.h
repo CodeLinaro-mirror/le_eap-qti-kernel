@@ -8,6 +8,14 @@
 #define QRTR_NODE_BCAST	0xffffffffu
 #define QRTR_PORT_CTRL	0xfffffffeu
 
+#ifndef AF_QIPCRTR
+/* Need this definition here as we could not export from kernel
+ * headers at include/linux/socket.h
+ *
+ */
+#define AF_QIPCRTR      42
+#endif // AF_QIPCRTR
+
 struct sockaddr_qrtr {
 	__kernel_sa_family_t sq_family;
 	__u32 sq_node;
