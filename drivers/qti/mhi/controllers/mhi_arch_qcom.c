@@ -23,7 +23,6 @@ struct arch_info {
 	struct mhi_dev *mhi_dev;
 	struct msm_bus_scale_pdata *msm_bus_pdata;
 	u32 bus_client;
-	struct msm_pcie_register_event pcie_reg_event;
 	struct pci_saved_state *pcie_state;
 	struct pci_saved_state *ref_pcie_state;
 };
@@ -127,17 +126,106 @@ int mhi_arch_link_on(struct mhi_controller *mhi_cntrl)
        return 0;
 }
 
+void mhi_arch_pcie_ssr_ops_power_off(void *priv)
+{
+	struct mhi_controller *mhi_cntrl = priv;
+	struct mhi_dev *mhi_dev = mhi_controller_get_devdata(mhi_cntrl);
+	struct arch_info *arch_info = mhi_dev->arch_info;
+	struct pci_dev *pci_dev = mhi_dev->pci_dev;
+
+	/*
+	 * Abort system suspend if system is preparing to go to suspend
+	 * by grabbing wake source.
+	 * If system is suspended, wait for pm notifier callback to notify
+	 * that resume has occurred with PM_POST_SUSPEND event.
+	 */
+	pm_stay_awake(&mhi_cntrl->mhi_dev->dev);
+
+	/* if link is in drv suspend, wake it up */
+	pm_runtime_get_sync(&pci_dev->dev);
+
+	mutex_lock(&mhi_cntrl->pm_mutex);
+	if (!mhi_dev->powered_on) {
+		MHI_LOG("Not in active state\n");
+		mutex_unlock(&mhi_cntrl->pm_mutex);
+		pm_runtime_put_noidle(&pci_dev->dev);
+	}
+	else {
+		mhi_dev->powered_on = false;
+		mutex_unlock(&mhi_cntrl->pm_mutex);
+
+		pm_runtime_put_noidle(&pci_dev->dev);
+
+		MHI_LOG("Triggering shutdown process\n");
+
+		mhi_power_down(mhi_cntrl, 1);
+
+		/* turn the link off */
+		mhi_deinit_pci_dev(mhi_cntrl);
+
+		mhi_arch_link_off(mhi_cntrl, true);
+
+		mhi_arch_iommu_deinit(mhi_cntrl);
+
+		mhi_arch_pcie_deinit(mhi_cntrl);
+
+		pm_relax(&mhi_cntrl->mhi_dev->dev);
+	}
+}
+EXPORT_SYMBOL(mhi_arch_pcie_ssr_ops_power_off);
+
+int mhi_arch_pcie_ssr_ops_power_on(void *priv)
+{
+	struct mhi_controller *mhi_cntrl = priv;
+	struct mhi_dev *mhi_dev = mhi_controller_get_devdata(mhi_cntrl);
+	struct pci_dev *pci_dev = mhi_dev->pci_dev;
+	int ret;
+
+	mutex_lock(&mhi_cntrl->pm_mutex);
+	if (mhi_dev->powered_on) {
+		MHI_LOG("MHI still in active state\n");
+		mutex_unlock(&mhi_cntrl->pm_mutex);
+		return 0;
+	}
+
+	MHI_LOG("Enter\n");
+
+	/* reset rpm state */
+	pm_runtime_set_active(&pci_dev->dev);
+
+	pm_runtime_enable(&pci_dev->dev);
+
+	mutex_unlock(&mhi_cntrl->pm_mutex);
+
+	pm_runtime_forbid(&pci_dev->dev);
+
+	ret = pm_runtime_get_sync(&pci_dev->dev);
+	if (ret < 0) {
+		MHI_ERR("Error with rpm resume, ret:%d\n", ret);
+		return ret;
+	}
+
+	/* re-start the link & recover default cfg states */
+	ret = msm_pcie_pm_control(MSM_PCIE_RESUME, pci_dev->bus->number,
+				  pci_dev, NULL, 0);
+	if (ret) {
+		MHI_ERR("Failed to resume pcie bus ret %d\n", ret);
+		return ret;
+	}
+
+	mhi_pci_probe(pci_dev, NULL);
+	return 0;
+}
+EXPORT_SYMBOL(mhi_arch_pcie_ssr_ops_power_on);
+
 int mhi_arch_pcie_init(struct mhi_controller *mhi_cntrl)
 {
 	struct mhi_dev *mhi_dev = mhi_controller_get_devdata(mhi_cntrl);
 	struct arch_info *arch_info = mhi_dev->arch_info;
-	struct mhi_link_info *cur_link_info;
 	char node[32];
 	int ret = 0;
 
 	if (!arch_info) {
-		struct msm_pcie_register_event *reg_event;
-
 		arch_info = devm_kzalloc(&mhi_dev->pci_dev->dev,
 					 sizeof(*arch_info), GFP_KERNEL);
 		if (!arch_info)

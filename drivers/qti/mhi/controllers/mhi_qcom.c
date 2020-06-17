@@ -26,6 +26,7 @@
 #include <linux/uaccess.h>
 #include <linux/mhi.h>
 #include <linux/version.h>
+#include <linux/pcie_ssr.h>
 #include "mhi_qcom.h"
 
 bool le_endpoint;
@@ -895,6 +896,9 @@ static int mhi_platform_probe(struct platform_device *pdev)
 				 &mhi_qcom_group);
 	if (ret)
 		goto error_register;
+
+	pr_crit("Registering with SSR");
+	register_pcie_ssr(mhi_cntrl);
 
 	return 0;
 
