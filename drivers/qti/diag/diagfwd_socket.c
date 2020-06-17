@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -980,13 +980,38 @@ static struct qmi_ops diag_qmi_cntl_ops = {
 	.del_server = diag_del_server,
 };
 
+static int diag_get_unsupported_peripherals(void)
+{
+	struct device_node *dev_node;
+	int unsupported_peripherals = 0;
+	int ret;
+
+	dev_node = of_find_node_by_name(NULL, "qcom,diag-service");
+	if (dev_node) {
+		ret = of_property_read_u32(dev_node,
+			"peripheral-unsupported", &unsupported_peripherals);
+		if (ret)
+			pr_err("diag: Error reading property ret=%d\n", ret);
+	}
+
+	return unsupported_peripherals;
+}
+
 int diag_socket_init(void)
 {
 	struct diag_socket_info *info = NULL;
 	int peripheral;
 	int rc;
+	int unsupported_peripherals = 0;
+
+	unsupported_peripherals = diag_get_unsupported_peripherals();
 
 	for (peripheral = 0; peripheral < NUM_PERIPHERALS; peripheral++) {
+
+		/* Initialize services only for supported peripherals */
+		if (unsupported_peripherals & (0x1 << peripheral))
+			continue;
+
 		info = &socket_cntl[peripheral];
 		__diag_socket_init(&socket_cntl[peripheral]);
 
@@ -1009,6 +1034,11 @@ int diag_socket_init(void)
 		goto fail;
 
 	for (peripheral = 0; peripheral < NUM_PERIPHERALS; peripheral++) {
+
+		/* Initialize services only for supported peripherals */
+		if (unsupported_peripherals & (0x1 << peripheral))
+			continue;
+
 		info = &socket_cmd[peripheral];
 		qmi_add_lookup(cntl_qmi, info->svc_id,
 			       info->ins_id & 0xFF, info->ins_id >> 8);
