@@ -18,6 +18,10 @@
 		mhi_netdev4 = &mhi_netdev_4;
 	};
 
+	ssr: qcom,pcie_ssr {
+		compatible = "qcom,pcie_ssr";
+	};
+
 	mhi_1: qcom,mhi-sa415m {
 		compatible = "qcom,mhi";
 
