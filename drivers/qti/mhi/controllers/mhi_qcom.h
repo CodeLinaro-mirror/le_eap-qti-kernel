@@ -64,6 +64,7 @@ struct mhi_dev {
 	unsigned int lpm_disable_depth;
 	/* lock to toggle low power modes */
 	spinlock_t lpm_lock;
+	bool le_endpoint;
 };
 
 void mhi_deinit_pci_dev(struct mhi_controller *mhi_cntrl);
