@@ -708,6 +708,9 @@ int mhi_pci_probe(struct pci_dev *pci_dev,
 	if (!mhi_cntrl)
 		return -EPROBE_DEFER;
 
+        pr_crit("Registering with SSR");
+        register_pcie_ssr(mhi_cntrl);
+
 	mhi_cntrl->dev_id = pci_dev->device;
 	mhi_dev = mhi_controller_get_devdata(mhi_cntrl);
 	mhi_dev->pci_dev = pci_dev;
@@ -896,9 +899,6 @@ static int mhi_platform_probe(struct platform_device *pdev)
 				 &mhi_qcom_group);
 	if (ret)
 		goto error_register;
-
-	pr_crit("Registering with SSR");
-	register_pcie_ssr(mhi_cntrl);
 
 	return 0;
 
