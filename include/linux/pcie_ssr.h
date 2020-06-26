@@ -13,7 +13,12 @@
 #ifndef __PCIE_SSR_H__
 #define __PCIE_SSR_H__
 
+#ifdef CONFIG_QTI_PCIE_SSR
 void register_pcie_ssr(void *priv);
+#else
+void register_pcie_ssr(void *priv)
+{}
+#endif
 int mhi_arch_pcie_ssr_ops_power_on(void *priv);
 void mhi_arch_pcie_ssr_ops_power_off(void *priv);
 
