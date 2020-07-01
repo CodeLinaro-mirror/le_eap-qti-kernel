@@ -19,6 +19,7 @@
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <net/ip6_checksum.h>
+#include <linux/etherdevice.h>
 #include "rmnet_private.h"
 #include "rmnet_config.h"
 #include "rmnet_vnd.h"
@@ -557,6 +558,14 @@ void rmnet_egress_handler(struct sk_buff *skb)
 		goto drop;
 
 	skb_len = skb->len;
+
+	if (port->data_format & RMNET_EGRESS_FORMAT_ETH) {
+		eth_header(skb, priv->real_dev, htons(skb->protocol),
+			port->eth_hdr.dst_mac_addr,
+			port->eth_hdr.src_mac_addr,
+			skb->len);
+		goto direct_xmit;
+	}
 
 	if (port->data_format & RMNET_EGRESS_FORMAT_IP_ROUTE)
 		goto direct_xmit;
