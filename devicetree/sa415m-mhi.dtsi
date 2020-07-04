@@ -1,4 +1,4 @@
-/* Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -18,6 +18,10 @@
 		mhi_netdev4 = &mhi_netdev_4;
 	};
 
+	ssr: qcom,pcie_ssr {
+		compatible = "qcom,pcie_ssr";
+	};
+
 	mhi_1: qcom,mhi-sa415m {
 		compatible = "qcom,mhi";
 
@@ -25,6 +29,7 @@
 		qcom,pci-domain = <0>;
 		qcom,pci-bus = <1>;
 		qcom,pci-slot = <0>;
+		qcom,le-endpoint;
 
 		/* controller specific configuration */
 		qcom,smmu-cfg = <0x3>;
