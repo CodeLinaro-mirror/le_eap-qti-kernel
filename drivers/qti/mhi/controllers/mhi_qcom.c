@@ -29,8 +29,6 @@
 #include <linux/pcie_ssr.h>
 #include "mhi_qcom.h"
 
-bool le_endpoint;
-
 struct firmware_info {
 	unsigned int dev_id;
 	const char *fw_image;
@@ -333,7 +331,7 @@ int mhi_system_suspend(struct device *dev)
 	 * framework to resume before calling system suspend
 	 * hence usage count is minimum one
 	 */
-	if ((atomic_read(&dev->power.usage_count) > 1) && !(le_endpoint)) {
+	if ((atomic_read(&dev->power.usage_count) > 1) && !(mhi_dev->le_endpoint)) {
 		/*
 		 * clients have requested to keep link on, try
 		 * fast suspend. No need to notify clients since
@@ -353,7 +351,7 @@ int mhi_system_suspend(struct device *dev)
 		 * device lpm but no active vote for PCIe from
 		 * apps processor
 		 */
-		if ((ret == -EBUSY) && !(le_endpoint)) {
+		if ((ret == -EBUSY) && !(mhi_dev->le_endpoint)) {
 			ret = mhi_pm_fast_suspend(mhi_cntrl, true);
 			mhi_dev->suspend_mode = MHI_FAST_LINK_ON;
 		}
@@ -819,7 +817,7 @@ static int mhi_platform_probe(struct platform_device *pdev)
 	if (ret)
 		goto error_register;
 
-	le_endpoint = of_property_read_bool(of_node,"qcom,le-endpoint");
+	mhi_dev->le_endpoint = of_property_read_bool(of_node,"qcom,le-endpoint");
 
 	ret = of_property_read_u32(of_node, "qcom,smmu-cfg",
 				   &mhi_dev->smmu_cfg);
