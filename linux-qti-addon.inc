@@ -97,6 +97,9 @@ do_unpack_extra () {
 	git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/006-Add-support-for-5.4-upstream-mhi.patch
 	git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/007-Add-support-for-5.4-upstream-qmi.patch
 	git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/008-Add-support-for-kernel-API-used-in-daig-and-mhi.patch
+	git apply ${WORKDIR}/eap-qti-kernel/009-mhi_bus-core-Add-support-for-MHI-host-interface.patch
+	git apply ${WORKDIR}/eap-qti-kernel/010-net-cdc_ether-Ensure-that-default-MTU-is-minimum-204.patch
+
 	cd -
     else
         bbfatal "Kernel version ${LINUX_VERSION} is not supported"
