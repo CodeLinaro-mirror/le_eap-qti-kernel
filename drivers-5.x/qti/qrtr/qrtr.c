@@ -671,7 +671,7 @@ static void qrtr_node_assign(struct qrtr_node *node, unsigned int nid)
 	 * cause APPS suspend problems and power drain issue.
 	 */
 	if (!node->ws && nid == 0)
-		node->ws = wakeup_source_register(name);
+		node->ws = wakeup_source_register(NULL, name);
 }
 
 /**
@@ -1694,7 +1694,7 @@ static int qrtr_connect(struct socket *sock, struct sockaddr *saddr,
 }
 
 static int qrtr_getname(struct socket *sock, struct sockaddr *saddr,
-			int *len, int peer)
+			int peer)
 {
 	struct qrtr_sock *ipc = qrtr_sk(sock->sk);
 	struct sockaddr_qrtr qaddr;
@@ -1713,7 +1713,6 @@ static int qrtr_getname(struct socket *sock, struct sockaddr *saddr,
 	}
 	release_sock(sk);
 
-	*len = sizeof(qaddr);
 	qaddr.sq_family = AF_QIPCRTR;
 
 	memcpy(saddr, &qaddr, sizeof(qaddr));
@@ -1761,7 +1760,9 @@ static int qrtr_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		}
 		break;
 	case SIOCGSTAMP:
-		rc = sock_get_timestamp(sk, argp);
+		rc = sock->ops->gettstamp(sock, argp,
+				          0,
+					  !IS_ENABLED(CONFIG_64BIT));
 		break;
 	case SIOCADDRT:
 	case SIOCDELRT:
