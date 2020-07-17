@@ -113,7 +113,7 @@ static void diag_stm_update_work_fn(struct work_struct *work)
 void diag_notify_md_client(uint8_t peripheral, int data)
 {
 	int stat = 0, proc = DIAG_LOCAL_PROC;
-	struct siginfo info;
+	struct kernel_siginfo info;
 	struct pid *pid_struct;
 	struct task_struct *result;
 
