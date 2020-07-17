@@ -90,8 +90,8 @@ struct rmnet_port {
 	struct sk_buff *agg_skb;
 	int agg_state;
 	u8 agg_count;
-	struct timespec agg_time;
-	struct timespec agg_last;
+	struct timespec64 agg_time;
+	struct timespec64 agg_last;
 	struct hrtimer hrtimer;
 	struct work_struct agg_wq;
 	u8 agg_size_order;
@@ -197,7 +197,8 @@ int rmnet_is_real_dev_registered(const struct net_device *real_dev);
 struct rmnet_port *rmnet_get_port(struct net_device *real_dev);
 struct rmnet_endpoint *rmnet_get_endpoint(struct rmnet_port *port, u8 mux_id);
 int rmnet_add_bridge(struct net_device *rmnet_dev,
-		     struct net_device *slave_dev);
+		     struct net_device *slave_dev,
+		     struct netlink_ext_ack *extack);
 int rmnet_del_bridge(struct net_device *rmnet_dev,
 		     struct net_device *slave_dev);
 
