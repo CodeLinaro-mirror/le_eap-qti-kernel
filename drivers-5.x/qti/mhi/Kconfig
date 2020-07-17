@@ -15,5 +15,5 @@ config QTI_MHI_DEBUG
 	  throughput as individual MHI packets and state transitions
 	  will be logged.
 
-source drivers/qti/mhi/controllers/Kconfig
-source drivers/qti/mhi/devices/Kconfig
+source "drivers/qti/mhi/controllers/Kconfig"
+source "drivers/qti/mhi/devices/Kconfig"
