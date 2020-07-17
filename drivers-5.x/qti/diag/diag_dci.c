@@ -195,7 +195,7 @@ static void create_dci_event_mask_tbl(unsigned char *tbl_buf)
 		memset(tbl_buf, 0, DCI_EVENT_MASK_SIZE);
 }
 
-void dci_drain_data(unsigned long data)
+void dci_drain_data(struct timer_list *t_list)
 {
 	queue_work(driver->diag_dci_wq, &dci_data_drain_work);
 }
@@ -246,13 +246,19 @@ static void dci_handshake_work_fn(struct work_struct *work)
 		  jiffies + msecs_to_jiffies(DCI_HANDSHAKE_WAIT_TIME));
 }
 
-static void dci_chk_handshake(unsigned long data)
+static void dci_chk_handshake(struct timer_list *t_list)
 {
-	int index = (int)data;
+	int index;
+	struct dci_channel_status_t *status = container_of(t_list,
+					struct dci_channel_status_t,
+					wait_time);
 
-	if (index < 0 || index >= NUM_DCI_PROC)
+	if (!status)
 		return;
 
+	index = status->pid;
+	if (index < 0 || index >= NUM_DCI_PROC)
+		return;
 }
 #endif
 
@@ -1537,7 +1543,7 @@ void diag_dci_channel_open_work(struct work_struct *work)
 void diag_dci_notify_client(int peripheral_mask, int data, int proc)
 {
 	int stat = 0;
-	struct siginfo info;
+	struct kernel_siginfo info;
 	struct list_head *start, *temp;
 	struct diag_dci_client_tbl *entry = NULL;
 	struct pid *pid_struct = NULL;
@@ -2781,7 +2787,7 @@ static void diag_dci_init_handshake_remote(void)
 		temp = &dci_channel_status[i];
 		temp->id = i;
 		INIT_WORK(&temp->handshake_work, dci_handshake_work_fn);
-		setup_timer(&temp->wait_time, dci_chk_handshake, i);
+		timer_setup(&temp->wait_time, dci_chk_handshake, 0);
 	}
 }
 
@@ -2863,7 +2869,7 @@ int diag_dci_init(void)
 
 	INIT_WORK(&dci_data_drain_work, dci_data_drain_work_fn);
 
-	setup_timer(&dci_drain_timer, dci_drain_data, 0);
+	timer_setup(&dci_drain_timer, dci_drain_data, 0);
 	return DIAG_DCI_NO_ERROR;
 err:
 	pr_err("diag: Could not initialize diag DCI buffers");

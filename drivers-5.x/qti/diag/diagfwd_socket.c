@@ -28,6 +28,7 @@
 #include <linux/notifier.h>
 #include <linux/qrtr.h>
 #include <linux/termios.h>
+#include <linux/soc/qcom/qmi.h>
 #include "diagchar.h"
 #include "diagfwd.h"
 #include "diagfwd_peripheral.h"
@@ -366,7 +367,6 @@ static void socket_open_server(struct diag_socket_info *info)
 	struct msghdr msg = {0};
 	struct kvec iv = { &pkt, sizeof(pkt) };
 	int ret;
-	int sl = sizeof(sq);
 	unsigned int size = DIAG_SO_RCVBUF_SIZE;
 
 	if (!info || info->port_type != PORT_TYPE_SERVER)
@@ -378,7 +378,7 @@ static void socket_open_server(struct diag_socket_info *info)
 		       info->name);
 		return;
 	}
-	ret = kernel_getsockname(info->hdl, (struct sockaddr *)&sq, &sl);
+	ret = kernel_getsockname(info->hdl, (struct sockaddr *)&sq);
 	if (ret < 0) {
 		pr_err("diag: In %s, getsockname failed %d\n", __func__,
 		       ret);
@@ -438,7 +438,7 @@ static void __socket_close_channel(struct diag_socket_info *info)
 	sock_release(info->hdl);
 	info->hdl = NULL;
 	mutex_unlock(&info->socket_info_mutex);
-	cancel_work(&info->read_work);
+	cancel_work_sync(&info->read_work);
 	wake_up_interruptible(&info->read_wait_q);
 
 	spin_lock_irqsave(&info->lock, flags);
