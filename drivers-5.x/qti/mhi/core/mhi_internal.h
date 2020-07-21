@@ -634,6 +634,7 @@ struct mhi_chan {
 	enum MHI_XFER_TYPE xfer_type;
 	enum MHI_CH_STATE ch_state;
 	enum MHI_EV_CCS ccs;
+	bool bei_disable;	/* block event interrupt */
 	bool lpm_notify;
 	bool configured;
 	bool offload_ch;
