@@ -1,0 +1,84 @@
+From 864d64fb8a70bdb51838f87b0681c1b5071ee8f9 Mon Sep 17 00:00:00 2001
+From: Sanjay Dwivedi <sanjaykd@codeaurora.org>
+Date: Wed, 1 Jul 2020 14:02:12 +0530
+Subject: [PATCH] [PATCH] Add support for upstream rmnet driver
+
+Signed-off-by: Sanjay Dwivedi <sanjaykd@codeaurora.org>
+---
+ include/linux/net.h       |  1 +
+ include/linux/netdevice.h |  2 ++
+ net/core/dev.c            |  8 ++++++++
+ net/socket.c              | 13 +++++++++++++
+ 4 files changed, 24 insertions(+)
+
+diff --git a/include/linux/net.h b/include/linux/net.h
+index 9cafb5f..12b2606 100644
+--- a/include/linux/net.h
++++ b/include/linux/net.h
+@@ -311,6 +311,7 @@ int kernel_sendpage(struct socket *sock, struct page *page, int offset,
+ int kernel_sendpage_locked(struct sock *sk, struct page *page, int offset,
+ 			   size_t size, int flags);
+ int kernel_sock_shutdown(struct socket *sock, enum sock_shutdown_cmd how);
++int kernel_sock_ioctl(struct socket *sock, int cmd, unsigned long arg);
+ 
+ /* Routine returns the IP overhead imposed by a (caller-protected) socket. */
+ u32 kernel_sock_ip_overhead(struct sock *sk);
+diff --git a/include/linux/netdevice.h b/include/linux/netdevice.h
+index c20f190..842de78 100644
+--- a/include/linux/netdevice.h
++++ b/include/linux/netdevice.h
+@@ -3321,6 +3321,7 @@ static inline void netdev_reset_queue(struct net_device *dev_queue)
+ 	netdev_tx_reset_queue(netdev_get_tx_queue(dev_queue, 0));
+ }
+ 
++
+ /**
+  * 	netdev_cap_txqueue - check if selected tx queue exceeds device queues
+  * 	@dev: network device
+@@ -4878,5 +4879,6 @@ do {								\
+ #define PTYPE_HASH_MASK	(PTYPE_HASH_SIZE - 1)
+ 
+ extern struct net_device *blackhole_netdev;
++extern struct napi_struct *get_current_napi_context(void);
+ 
+ #endif	/* _LINUX_NETDEVICE_H */
+diff --git a/net/core/dev.c b/net/core/dev.c
+index 99ac84f..4bd81bb 100644
+--- a/net/core/dev.c
++++ b/net/core/dev.c
+@@ -6289,6 +6289,14 @@ void netif_napi_del(struct napi_struct *napi)
+ }
+ EXPORT_SYMBOL(netif_napi_del);
+ 
++struct napi_struct *get_current_napi_context(void)
++{
++        struct softnet_data *sd = this_cpu_ptr(&softnet_data);
++
++        return &(sd->backlog);
++}
++EXPORT_SYMBOL(get_current_napi_context);
++
+ static int napi_poll(struct napi_struct *n, struct list_head *repoll)
+ {
+ 	void *have;
+diff --git a/net/socket.c b/net/socket.c
+index d7a1060..3b94794 100644
+--- a/net/socket.c
++++ b/net/socket.c
+@@ -3852,3 +3852,16 @@ u32 kernel_sock_ip_overhead(struct sock *sk)
+ 	}
+ }
+ EXPORT_SYMBOL(kernel_sock_ip_overhead);
++
++int kernel_sock_ioctl(struct socket *sock, int cmd, unsigned long arg)
++{
++        mm_segment_t oldfs = get_fs();
++        int err;
++
++        set_fs(KERNEL_DS);
++        err = sock->ops->ioctl(sock, cmd, arg);
++        set_fs(oldfs);
++
++        return err;
++}
++EXPORT_SYMBOL(kernel_sock_ioctl);

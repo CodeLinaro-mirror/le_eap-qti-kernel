@@ -32,6 +32,11 @@ SRC_URI += "file://eap-qti-kernel"
 LINUX_VERSION ??= "${PV}"
 
 do_unpack_extra () {
+    if [ "${@d.getVar('LINUX_VERSION')[0:3]}" = "5.4" ]; then
+	rm -rf ${WORKDIR}/eap-qti-kernel/drivers
+	mv ${WORKDIR}/eap-qti-kernel/drivers-5.x ${WORKDIR}/eap-qti-kernel/drivers
+    fi
+
     cp -r ${WORKDIR}/eap-qti-kernel/* ${S}/
 
     if [ -e ${S}/arch/arm/boot/dts ]; then
@@ -90,6 +95,13 @@ do_unpack_extra () {
         git apply ${WORKDIR}/eap-qti-kernel/patches-4.14/0004-Add-support-for-upstream-rmnet-driver.patch
 		git apply ${WORKDIR}/eap-qti-kernel/patches-4.14/0005-net-cdc_ether-Ensure-that-default-MTU-is-minimum-204.patch
         cd -
+    elif [ "${@d.getVar('LINUX_VERSION')[0:3]}" = "5.4" ]; then
+        cd ${S}
+       sed -e '/PCIe/,+7d' ${WORKDIR}/eap-qti-kernel/defconfig -i ${WORKDIR}/eap-qti-kernel/defconfig
+       git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/008-Add-support-for-kernel-API-used-in-daig-and-mhi.patch
+       git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/009-mhi_bus-core-Add-support-for-MHI-host-interface.patch
+       git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/010-net-cdc_ether-Ensure-that-default-MTU-is-minimum-204.patch
+       cd -
     else
         bbfatal "Kernel version ${LINUX_VERSION} is not supported"
     fi
