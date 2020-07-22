@@ -22,6 +22,7 @@
 #include <linux/platform_device.h>
 #include <linux/spinlock.h>
 #include <linux/ratelimit.h>
+#include <linux/kmemleak.h>
 #include "diagchar.h"
 #include "diagfwd.h"
 #include "diag_mux.h"

@@ -20,6 +20,7 @@
 #include <linux/workqueue.h>
 #include <linux/pm_runtime.h>
 #include <linux/platform_device.h>
+#include <linux/kmemleak.h>
 #include <asm/current.h>
 #include "diagmem.h"
 #include "diagfwd_bridge.h"
