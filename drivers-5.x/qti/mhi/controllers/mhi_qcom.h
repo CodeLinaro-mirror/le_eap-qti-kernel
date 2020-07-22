@@ -91,7 +91,8 @@ static inline void mhi_arch_iommu_deinit(struct mhi_controller *mhi_cntrl)
 #define MHI_IPC_LOG_PAGES (10)
 #endif
 
-static inline int mhi_arch_pcie_init(struct mhi_controller *mhi_cntrl)
+#ifndef CONFIG_QTI_MHI_BUS_ARCH
+int mhi_arch_pcie_init(struct mhi_controller *mhi_cntrl)
 {
 	char node[32];
 
@@ -105,23 +106,28 @@ static inline int mhi_arch_pcie_init(struct mhi_controller *mhi_cntrl)
 	return 0;
 }
 
+int mhi_arch_link_suspend(struct mhi_controller *mhi_cntrl)
+{
+	return 0;
+}
+
+int mhi_arch_link_resume(struct mhi_controller *mhi_cntrl)
+{
+	return 0;
+}
+#else
+int mhi_arch_pcie_init(struct mhi_controller *mhi_cntrl);
+int mhi_arch_link_suspend(struct mhi_controller *mhi_cntrl);
+int mhi_arch_link_resume(struct mhi_controller *mhi_cntrl);
+#endif
+
 static inline void mhi_arch_pcie_deinit(struct mhi_controller *mhi_cntrl)
 {
 }
 
-static inline int mhi_arch_link_suspend(struct mhi_controller *mhi_cntrl)
-{
-	return 0;
-}
-
-static inline int mhi_arch_link_resume(struct mhi_controller *mhi_cntrl)
-{
-	return 0;
-}
 
 static inline int mhi_arch_power_up(struct mhi_controller *mhi_cntrl)
 {
 	return 0;
 }
-
 #endif /* _MHI_QCOM_ */
