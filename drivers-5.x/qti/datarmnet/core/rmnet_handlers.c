@@ -31,10 +31,11 @@
 #include "rmnet_qmi.h"
 #include "qmi_rmnet.h"
 
-#define RMNET_IP_VERSION_4 0x40
-#define RMNET_IP_VERSION_6 0x60
 #define CREATE_TRACE_POINTS
 #include "rmnet_trace.h"
+
+#define RMNET_IP_VERSION_4 0x40
+#define RMNET_IP_VERSION_6 0x60
 
 EXPORT_TRACEPOINT_SYMBOL(rmnet_shs_low);
 EXPORT_TRACEPOINT_SYMBOL(rmnet_shs_high);
@@ -183,6 +184,8 @@ static void rmnet_ip_route_rcv(struct sk_buff *skb, struct rmnet_port *port)
 	u16 pkt_len;
 	u8 proto;
 
+	trace_rmnet_skb_ip_route_entry(skb);
+
 	skb_reset_transport_header(skb);
 	skb_reset_network_header(skb);
 
@@ -238,6 +241,8 @@ static void rmnet_ip_route_rcv(struct sk_buff *skb, struct rmnet_port *port)
 
 	skb->dev = ep->egress_dev;
 	rmnet_vnd_rx_fixup(skb->dev, skb->len);
+
+	trace_rmnet_skb_ip_route_exit(skb);
 
 	netif_receive_skb(skb);
 	return;
@@ -515,6 +520,7 @@ void rmnet_egress_handler(struct sk_buff *skb)
 	mux_id = priv->mux_id;
 
 	port = rmnet_get_port(skb->dev);
+	trace_rmnet_skb_egress_entry(skb);
 	if (!port)
 		goto drop;
 
@@ -532,6 +538,7 @@ void rmnet_egress_handler(struct sk_buff *skb)
 	}
 
 direct_xmit:
+	trace_rmnet_skb_egress_exit(skb);
 	rmnet_vnd_tx_fixup(orig_dev, skb_len);
 
 	dev_queue_xmit(skb);
