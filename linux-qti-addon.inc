@@ -104,6 +104,10 @@ do_unpack_extra () {
         cd -
     elif [ "${@d.getVar('LINUX_VERSION')[0:3]}" = "5.4" ]; then
         cd ${S}
+        sed -e '/CONFIG_QTI_RMNET/d' ${WORKDIR}/eap-qti-kernel/defconfig -i ${WORKDIR}/eap-qti-kernel/defconfig
+        sed -e '/CONFIG_QTI_QMI_RMNET/d' ${WORKDIR}/eap-qti-kernel/defconfig -i ${WORKDIR}/eap-qti-kernel/defconfig
+        sed -e '/CONFIG_QTI_RMNET_CTL/d' ${WORKDIR}/eap-qti-kernel/defconfig -i ${WORKDIR}/eap-qti-kernel/defconfig
+        sed -e '/CONFIG_QTI_QMI_DFC/d' ${WORKDIR}/eap-qti-kernel/defconfig -i ${WORKDIR}/eap-qti-kernel/defconfig
         git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/008-Add-support-for-kernel-API-used-in-daig-and-mhi.patch
         git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/009-mhi_bus-core-Add-support-for-MHI-host-interface.patch
         git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/010-net-cdc_ether-Ensure-that-default-MTU-is-minimum-204.patch
