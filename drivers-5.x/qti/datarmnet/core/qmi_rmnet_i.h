@@ -86,6 +86,14 @@ struct qos_info {
 	spinlock_t qos_lock;
 };
 
+struct rmnet_powersave_work {
+	struct delayed_work work;
+	struct alarm atimer;
+	void *port;
+	u64 old_rx_pkts;
+	u64 old_tx_pkts;
+};
+
 struct qmi_info {
 	int flag;
 	void *wda_client;
@@ -94,6 +102,9 @@ struct qmi_info {
 	void *dfc_pending[MAX_CLIENT_NUM];
 	bool dfc_client_exiting[MAX_CLIENT_NUM];
 	unsigned long ps_work_active;
+	struct workqueue_struct  *rmnet_ps_wq;
+	struct rmnet_powersave_work *rmnet_work;
+	bool rmnet_work_quit;
 	bool ps_enabled;
 	bool dl_msg_active;
 	bool ps_ignore_grant;
@@ -204,7 +215,7 @@ int
 wda_qmi_client_init(void *port, struct svc_info *psvc, struct qmi_info *qmi);
 void wda_qmi_client_exit(void *wda_data);
 int wda_set_powersave_mode(void *wda_data, u8 enable);
-void qmi_rmnet_flush_ps_wq(void);
+void qmi_rmnet_flush_ps_wq(struct qmi_info *qmi);
 #else
 static inline int
 wda_qmi_client_init(void *port, struct svc_info *psvc, struct qmi_info *qmi)
@@ -220,7 +231,7 @@ static inline int wda_set_powersave_mode(void *wda_data, u8 enable)
 {
 	return -EINVAL;
 }
-static inline void qmi_rmnet_flush_ps_wq(void)
+static inline void qmi_rmnet_flush_ps_wq(struct qmi_info *qmi)
 {
 }
 #endif
