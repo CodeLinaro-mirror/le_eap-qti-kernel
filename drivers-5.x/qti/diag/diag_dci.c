@@ -256,7 +256,7 @@ static void dci_chk_handshake(struct timer_list *t_list)
 	if (!status)
 		return;
 
-	index = status->pid;
+	index = status->id;
 	if (index < 0 || index >= NUM_DCI_PROC)
 		return;
 }
