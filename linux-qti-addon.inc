@@ -93,12 +93,10 @@ do_unpack_extra () {
         cd -
     elif [ "${@d.getVar('LINUX_VERSION')[0:3]}" = "5.4" ]; then
         cd ${S}
-	sed -e '/PCIe/,+7d' ${WORKDIR}/eap-qti-kernel/defconfig -i ${WORKDIR}/eap-qti-kernel/defconfig
-	git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/008-Add-support-for-kernel-API-used-in-daig-and-mhi.patch
-	git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/009-mhi_bus-core-Add-support-for-MHI-host-interface.patch
-	git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/010-net-cdc_ether-Ensure-that-default-MTU-is-minimum-204.patch
-
-	cd -
+       git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/008-Add-support-for-kernel-API-used-in-daig-and-mhi.patch
+       git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/009-mhi_bus-core-Add-support-for-MHI-host-interface.patch
+       git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/010-net-cdc_ether-Ensure-that-default-MTU-is-minimum-204.patch
+       cd -
     else
         bbfatal "Kernel version ${LINUX_VERSION} is not supported"
     fi
