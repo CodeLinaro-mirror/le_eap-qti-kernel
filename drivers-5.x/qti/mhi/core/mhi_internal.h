@@ -784,7 +784,7 @@ static inline void *mhi_alloc_coherent(struct mhi_controller *mhi_cntrl,
 				       dma_addr_t *dma_handle,
 				       gfp_t gfp)
 {
-	void *buf = dma_zalloc_coherent(mhi_cntrl->dev, size, dma_handle, gfp);
+	void *buf = dma_alloc_coherent(mhi_cntrl->dev, size, dma_handle, gfp);
 
 	if (buf)
 		atomic_add(size, &mhi_cntrl->alloc_size);

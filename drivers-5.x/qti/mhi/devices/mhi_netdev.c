@@ -694,7 +694,7 @@ static void mhi_netdev_push_skb(struct mhi_netdev *mhi_netdev,
 
 		skb->protocol = mhi_netdev_ip_type_trans(*(u8 *)mhi_buf->buf);
 		if (!strncmp(mhi_netdev->ndev->name, "rmnet_mhi1", 10)) {
-			getnstimeofday64(&now);
+			ktime_get_real_ts64(&now);
 			MSG_LOG("%s-%s: skb %p time %lu.%lu\n", mhi_netdev->ndev->name,
 				mhi_netdev->interface_name,skb, now.tv_sec, now.tv_nsec);
 		}
@@ -835,7 +835,7 @@ static void mhi_netdev_remove(struct mhi_device *mhi_dev)
 		debugfs_remove_recursive(mhi_netdev->dentry);
 }
 
-static int mhi_netdev_match(struct device *dev, void *data)
+static int mhi_netdev_match(struct device *dev, const void *data)
 {
 	/* if phandle dt == device dt, we found a match */
 	return (dev->of_node == data);
