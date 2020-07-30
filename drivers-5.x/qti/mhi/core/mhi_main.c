@@ -2077,7 +2077,7 @@ int mhi_get_no_free_descriptors(struct mhi_device *mhi_dev,
 }
 EXPORT_SYMBOL(mhi_get_no_free_descriptors);
 
-static int __mhi_bdf_to_controller(struct device *dev, void *tmp)
+static int __mhi_bdf_to_controller(struct device *dev, const void *tmp)
 {
 	struct mhi_device *mhi_dev = to_mhi_device(dev);
 	struct mhi_device *match = tmp;
