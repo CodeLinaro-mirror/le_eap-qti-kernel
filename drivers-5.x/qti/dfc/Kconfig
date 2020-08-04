@@ -1,0 +1,32 @@
+#
+# RMNET MAP driver
+#
+
+menuconfig QTI_QMI_RMNET
+	bool "QTI QMI Rmnet Helpers"
+	depends on QTI_RMNET
+	help
+	  Helper for handling interfaces between kernel clients and rmnet
+	  driver. It enables the rmnet driver to create/delete DFC/WDA
+	  clients and provides the common functionality for data flow control
+	  and power save features.
+
+
+menuconfig QTI_QMI_DFC
+	bool "Enable burst mode flow control"
+	depends on QTI_QMI_RMNET
+	help
+	  Say y here to enable support for burst mode data flow control.
+	  DFC client provides an interface to the modem dfc service and
+	  does burst mode flow control. It enables the flow on receiving flow
+	  status indication and disables flows while grant size is reached.
+	  If unsure or not use burst mode flow control, say 'N'.
+
+menuconfig QTI_QMI_POWER_COLLAPSE
+	bool "Enable power save features"
+	depends on QTI_QMI_RMNET
+	help
+	  Say y here to enable support for power save features.
+	  It provides an interface to offload uplink flow control based on
+	  detected flow status.
+	  If unsure or not use power save feature, say 'N'.
