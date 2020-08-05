@@ -26,6 +26,7 @@
 #include <linux/uaccess.h>
 #include <linux/mhi.h>
 #include <linux/version.h>
+#include <linux/pcie_ssr.h>
 #include "mhi_qcom.h"
 
 struct firmware_info {
@@ -330,7 +331,7 @@ int mhi_system_suspend(struct device *dev)
 	 * framework to resume before calling system suspend
 	 * hence usage count is minimum one
 	 */
-	if (atomic_read(&dev->power.usage_count) > 1) {
+	if ((atomic_read(&dev->power.usage_count) > 1) && !(mhi_dev->le_endpoint)) {
 		/*
 		 * clients have requested to keep link on, try
 		 * fast suspend. No need to notify clients since
@@ -350,7 +351,7 @@ int mhi_system_suspend(struct device *dev)
 		 * device lpm but no active vote for PCIe from
 		 * apps processor
 		 */
-		if (ret == -EBUSY) {
+		if ((ret == -EBUSY) && !(mhi_dev->le_endpoint)) {
 			ret = mhi_pm_fast_suspend(mhi_cntrl, true);
 			mhi_dev->suspend_mode = MHI_FAST_LINK_ON;
 		}
@@ -705,6 +706,9 @@ int mhi_pci_probe(struct pci_dev *pci_dev,
 	if (!mhi_cntrl)
 		return -EPROBE_DEFER;
 
+        pr_crit("Registering with SSR");
+        register_pcie_ssr(mhi_cntrl);
+
 	mhi_cntrl->dev_id = pci_dev->device;
 	mhi_dev = mhi_controller_get_devdata(mhi_cntrl);
 	mhi_dev->pci_dev = pci_dev;
@@ -815,6 +819,8 @@ static int mhi_platform_probe(struct platform_device *pdev)
 	ret = of_property_read_u32(of_node, "qcom,pci-slot", &mhi_cntrl->slot);
 	if (ret)
 		goto error_register;
+
+	mhi_dev->le_endpoint = of_property_read_bool(of_node,"qcom,le-endpoint");
 
 	ret = of_property_read_u32(of_node, "qcom,smmu-cfg",
 				   &mhi_dev->smmu_cfg);

@@ -1109,6 +1109,8 @@ static int of_parse_ch_cfg(struct mhi_controller *mhi_cntrl,
 							     "mhi,auto-start");
 		mhi_chan->wake_capable = of_property_read_bool(child,
 							"mhi,wake-capable");
+		mhi_chan->bei_disable = of_property_read_bool(child,
+							    "mhi,bei-disable");
 
 		if (mhi_chan->pre_alloc &&
 		    (mhi_chan->dir != DMA_FROM_DEVICE ||
