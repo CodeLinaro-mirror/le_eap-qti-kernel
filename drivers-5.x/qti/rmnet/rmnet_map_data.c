@@ -17,6 +17,7 @@
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/version.h>
+#include <linux/timekeeping.h>
 #include <net/ip6_checksum.h>
 #include "rmnet_config.h"
 #include "rmnet_map.h"
@@ -395,7 +396,7 @@ struct sk_buff *rmnet_map_deaggregate(struct sk_buff *skb,
 		if (!skbn)
 			return NULL;
 
-		skb_append_pagefrags(skbn, page, frag0->page_offset,
+		skb_append_pagefrags(skbn, page, frag0->bv_offset,
 				     packet_len);
 		skbn->data_len += packet_len;
 		skbn->len += packet_len;
@@ -658,7 +659,7 @@ static void rmnet_map_nonlinear_copy(struct sk_buff *coal_skb,
 		struct page *page = skb_frag_page(frag0);
 
 		skb_append_pagefrags(dest, page,
-				     frag0->page_offset + coal_meta->ip_len +
+				     frag0->bv_offset + coal_meta->ip_len +
 				     coal_meta->trans_len +
 				     coal_meta->data_offset,
 				     copy_len);
@@ -1406,21 +1407,24 @@ static struct sk_buff *rmnet_map_build_skb(struct rmnet_port *port)
 
 void rmnet_map_tx_aggregate(struct sk_buff *skb, struct rmnet_port *port)
 {
-	struct timespec diff, last;
+	struct timespec64 diff, last;
+	struct timespec temp;
 	int size, agg_count = 0;
 	struct sk_buff *agg_skb;
 	unsigned long flags;
 
 new_packet:
 	spin_lock_irqsave(&port->agg_lock, flags);
-	memcpy(&last, &port->agg_last, sizeof(struct timespec));
-	getnstimeofday(&port->agg_last);
+	memcpy(&last, &port->agg_last, sizeof(struct timespec64));
+	getnstimeofday(&temp);
+	port->agg_last.tv_sec = temp.tv_sec;
+	port->agg_last.tv_nsec = temp.tv_nsec;
 
 	if (!port->agg_skb) {
 		/* Check to see if we should agg first. If the traffic is very
 		 * sparse, don't aggregate. We will need to tune this later
 		 */
-		diff = timespec_sub(port->agg_last, last);
+		diff = timespec64_sub(port->agg_last, last);
 		size = port->egress_agg_params.agg_size - skb->len;
 
 		if (diff.tv_sec > 0 || diff.tv_nsec > rmnet_agg_bypass_time ||
@@ -1435,7 +1439,7 @@ new_packet:
 		if (!port->agg_skb) {
 			port->agg_skb = 0;
 			port->agg_count = 0;
-			memset(&port->agg_time, 0, sizeof(struct timespec));
+			memset(&port->agg_time, 0, sizeof(struct timespec64));
 			spin_unlock_irqrestore(&port->agg_lock, flags);
 			skb->protocol = htons(ETH_P_MAP);
 			dev_queue_xmit(skb);
@@ -1445,11 +1449,13 @@ new_packet:
 		port->agg_skb->dev = skb->dev;
 		port->agg_skb->protocol = htons(ETH_P_MAP);
 		port->agg_count = 1;
-		getnstimeofday(&port->agg_time);
+		getnstimeofday(&temp);
+		port->agg_last.tv_sec = temp.tv_sec;
+		port->agg_last.tv_nsec = temp.tv_nsec;
 		dev_kfree_skb_any(skb);
 		goto schedule;
 	}
-	diff = timespec_sub(port->agg_last, port->agg_time);
+	diff = timespec64_sub(port->agg_last, port->agg_time);
 	size = port->egress_agg_params.agg_size - port->agg_skb->len;
 
 	if (skb->len > size ||
@@ -1459,7 +1465,7 @@ new_packet:
 		agg_count = port->agg_count;
 		port->agg_skb = 0;
 		port->agg_count = 0;
-		memset(&port->agg_time, 0, sizeof(struct timespec));
+		memset(&port->agg_time, 0, sizeof(struct timespec64));
 		port->agg_state = 0;
 		spin_unlock_irqrestore(&port->agg_lock, flags);
 		hrtimer_cancel(&port->hrtimer);

@@ -98,7 +98,7 @@ static inline void *rmnet_frag_pull(struct rmnet_frag_descriptor *frag_desc,
 		return NULL;
 	}
 
-	frag_desc->frag.page_offset += size;
+	frag_desc->frag.bv_offset += size;
 	skb_frag_size_sub(&frag_desc->frag, size);
 
 	return rmnet_frag_data_ptr(frag_desc);
@@ -127,7 +127,7 @@ static inline void rmnet_frag_fill(struct rmnet_frag_descriptor *frag_desc,
 	get_page(p);
 	__skb_frag_set_page(&frag_desc->frag, p);
 	skb_frag_size_set(&frag_desc->frag, len);
-	frag_desc->frag.page_offset = page_offset;
+	frag_desc->frag.bv_offset = page_offset;
 }
 
 static inline u8
