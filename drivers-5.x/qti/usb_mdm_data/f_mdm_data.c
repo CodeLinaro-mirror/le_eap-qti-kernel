@@ -869,16 +869,16 @@ static struct timestamp_buf dbg_data = {
 /*get_timestamp - returns time of day in us */
 static unsigned int get_timestamp(void)
 {
-	struct timeval	tval;
+	struct timespec64 tval;
 	unsigned int	stamp;
 
 	if (!record_timestamp)
 		return 0;
 
-	do_gettimeofday(&tval);
+	ktime_get_raw_ts64(&tval);
 	/* 2^32 = 4294967296. Limit to 4096s. */
 	stamp = tval.tv_sec & 0xFFF;
-	stamp = stamp * 1000000 + tval.tv_usec;
+	stamp = stamp * 1000000 + (tval.tv_nsec/1000);
 	return stamp;
 }
 
