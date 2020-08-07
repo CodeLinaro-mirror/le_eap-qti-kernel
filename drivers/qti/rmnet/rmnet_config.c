@@ -28,6 +28,7 @@
 #include "rmnet_descriptor.h"
 #include <linux/rmnet_qmi.h>
 #include <linux/qmi_rmnet.h>
+#include  "rmnet_sig.h"
 
 /* Locking scheme -
  * The shared resource which needs to be protected is realdev->rx_handler_data.
@@ -906,7 +907,13 @@ static int __init rmnet_init(void)
 	if (rc != 0)
 		goto err2;
 
+	rc = rmnet_sig_init();
+	if (rc != 0)
+		goto err3;
+
 	return 0;
+err3:
+	unregister_inetaddr_notifier(&rmnet_addr4_notifier_block);
 
 err2:
 	unregister_inet6addr_notifier(&rmnet_addr6_notifier_block);
@@ -921,6 +928,7 @@ err0:
 
 static void __exit rmnet_exit(void)
 {
+	rmnet_sig_exit();
 	unregister_inetaddr_notifier(&rmnet_addr4_notifier_block);
 	unregister_inet6addr_notifier(&rmnet_addr6_notifier_block);
 	unregister_netdevice_notifier(&rmnet_dev_notifier);
