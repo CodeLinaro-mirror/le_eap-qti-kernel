@@ -1717,7 +1717,7 @@ static int qrtr_getname(struct socket *sock, struct sockaddr *saddr,
 
 	memcpy(saddr, &qaddr, sizeof(qaddr));
 
-	return 0;
+	return sizeof(qaddr);
 }
 
 static int qrtr_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
