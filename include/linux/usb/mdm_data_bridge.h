@@ -19,6 +19,8 @@
 
 #define MAX_INST_NAME_LEN 40
 
+#define ACM_CTRL_DTR (1 << 0)
+
 enum bridge_id {
 	USB_BRIDGE_QDSS,
 	USB_BRIDGE_DPL,
@@ -63,6 +65,7 @@ static int bridge_id_to_protocol(enum bridge_id id)
 
 struct bridge_ops {
 	int (*send_pkt)(void *, void *, size_t actual);
+	void (*send_cbits)(void *, unsigned int);
 
 	/* flow control */
 	void (*unthrottle_tx)(void *);
@@ -135,8 +138,8 @@ int data_bridge_write(unsigned int id, struct sk_buff *skb);
 int data_bridge_unthrottle_rx(unsigned int id);
 int ctrl_bridge_open(struct bridge *brdg);
 void ctrl_bridge_close(unsigned int id);
-int ctrl_bridge_write(unsigned int id, char *buf, size_t len);
-int ctrl_bridge_set_cbits(unsigned int id, unsigned int cbits);
+void ctrl_bridge_write(unsigned int id, char *buf, size_t len);
+void ctrl_bridge_set_cbits(unsigned int id, unsigned int cbits);
 unsigned int ctrl_bridge_get_cbits_tohost(unsigned int id);
 
 /* defined in control bridge */
@@ -175,17 +178,11 @@ static inline int __maybe_unused ctrl_bridge_open(struct bridge *brdg)
 
 static inline void __maybe_unused ctrl_bridge_close(unsigned int id) { }
 
-static inline int __maybe_unused ctrl_bridge_write(unsigned int id,
-						char *data, size_t size)
-{
-	return -ENODEV;
-}
+static inline void __maybe_unused ctrl_bridge_write(unsigned int id,
+						char *data, size_t size) { }
 
-static inline int __maybe_unused ctrl_bridge_set_cbits(unsigned int id,
-					unsigned int cbits)
-{
-	return -ENODEV;
-}
+static inline void __maybe_unused ctrl_bridge_set_cbits(unsigned int id,
+					unsigned int cbits) { }
 
 static inline unsigned int __maybe_unused
 ctrl_bridge_get_cbits_tohost(unsigned int id)

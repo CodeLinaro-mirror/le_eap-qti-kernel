@@ -61,6 +61,7 @@ struct data_bridge {
 	struct usb_interface		*intf;
 	struct usb_device		*udev;
 	char				*name;
+	int				id;
 
 	unsigned int			bulk_in;
 	unsigned int			bulk_out;
@@ -590,15 +591,20 @@ static int bridge_resume(struct usb_interface *iface)
 	if (dev->brdg)
 		queue_work(dev->wq, &dev->process_rx_w);
 
-	return 0;
+	return ctrl_bridge_resume(dev->id);
 }
 
 static int bridge_suspend(struct usb_interface *intf, pm_message_t message)
 {
 	struct data_bridge	*dev = usb_get_intfdata(intf);
+	int ret;
 
 	if (atomic_read(&dev->pending_txurbs))
 		return -EBUSY;
+
+	ret = ctrl_bridge_suspend(dev->id);
+	if (ret)
+		return ret;
 
 	set_bit(SUSPENDED, &dev->flags);
 	usb_kill_anchored_urbs(&dev->rx_active);
@@ -842,6 +848,7 @@ bridge_probe(struct usb_interface *iface, const struct usb_device_id *id)
 	struct usb_host_endpoint	*endpoint = NULL;
 	struct usb_host_endpoint	*bulk_in = NULL;
 	struct usb_host_endpoint	*bulk_out = NULL;
+	struct usb_host_endpoint	*int_in = NULL;
 	struct usb_device		*udev = interface_to_usbdev(iface);
 	int				i;
 	int				status;
@@ -882,15 +889,12 @@ bridge_probe(struct usb_interface *iface, const struct usb_device_id *id)
 			bulk_in = endpoint;
 		else if (usb_endpoint_is_bulk_out(&endpoint->desc))
 			bulk_out = endpoint;
-	}
-
-	if ((num_eps != 1 && num_eps != 2) || ((num_eps == 1) && !bulk_in) ||
-	    ((num_eps == 2) && (!bulk_in || !bulk_out))) {
-		dev_err(&iface->dev, "%s: invalid endpoints\n", __func__);
-		return -EINVAL;
+		else if (usb_endpoint_is_int_in(&endpoint->desc))
+			int_in = endpoint;
 	}
 
 	dev = __mdm_dev[devid];
+	dev->id = devid;
 	if (dev->intf) {
 		pr_err("%s: Device %d already probed\n", __func__, devid);
 		return -ENODEV;
@@ -919,11 +923,18 @@ bridge_probe(struct usb_interface *iface, const struct usb_device_id *id)
 
 	usb_set_intfdata(iface, dev);
 
+	status = ctrl_bridge_probe(iface, int_in, bname, devid);
+	if (status < 0) {
+		pr_err("%s: ctrl_bridge_probe failed %d\n",
+			__func__, status);
+		goto clean_dev;
+	}
+
 	dev->pdev = platform_device_alloc(dev->name, -1);
 	if (!dev->pdev) {
 		pr_err("%s: unable to allocate platform device\n", __func__);
 		status = -ENOMEM;
-		goto clean_dev;
+		goto free_cdev;
 	}
 
 	/*allocate list of rx urbs*/
@@ -947,6 +958,8 @@ free_rx_urbs:
 	free_rx_urbs(dev);
 put_pdev:
 	platform_device_put(dev->pdev);
+free_cdev:
+	ctrl_bridge_disconnect(devid);
 clean_dev:
 	usb_set_intfdata(iface, NULL);
 	usb_put_intf(iface);
@@ -966,6 +979,7 @@ static void bridge_disconnect(struct usb_interface *intf)
 
 	platform_device_unregister(dev->pdev);
 	free_rx_urbs(dev);
+	ctrl_bridge_disconnect(dev->id);
 	usb_set_intfdata(intf, NULL);
 	usb_put_intf(intf);
 	dev->intf = NULL;
@@ -1028,6 +1042,10 @@ static int __init bridge_init(void)
 	int ret, i;
 	int num_instances = 0;
 
+	ret = ctrl_bridge_init();
+	if (ret)
+		return ret;
+
 	for (i = 0; i < MAX_BRIDGE_DEVICES; i++) {
 		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
 		if (!dev) {
@@ -1066,6 +1084,8 @@ dev_free:
 		__mdm_dev[i] = NULL;
 	}
 
+	ctrl_bridge_exit();
+
 	return ret;
 }
 
@@ -1082,6 +1102,8 @@ static void __exit bridge_exit(void)
 		kfree(dev);
 		__mdm_dev[i] = NULL;
 	}
+
+	ctrl_bridge_exit();
 }
 
 module_init(bridge_init);
