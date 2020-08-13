@@ -20,12 +20,14 @@
 #define MAX_INST_NAME_LEN 40
 
 #define ACM_CTRL_DTR (1 << 0)
+#define ACM_CTRL_RTS (1 << 1)
 
 enum bridge_id {
 	USB_BRIDGE_QDSS,
 	USB_BRIDGE_DPL,
 	USB_BRIDGE_EDL,
 	USB_BRIDGE_DIAG,
+	USB_BRIDGE_RMNET,
 	MAX_BRIDGE_DEVICES,
 };
 
@@ -42,6 +44,8 @@ static int bridge_name_to_id(const char *name)
 		return USB_BRIDGE_EDL;
 	if (!strncasecmp(name, "diag", MAX_INST_NAME_LEN))
 		return USB_BRIDGE_DIAG;
+	if (!strncasecmp(name, "rmnet", MAX_INST_NAME_LEN))
+		return USB_BRIDGE_RMNET;
 
 fail:
 	return -EINVAL;
@@ -58,6 +62,8 @@ static int bridge_id_to_protocol(enum bridge_id id)
 		return 0x10;
 	case USB_BRIDGE_DIAG:
 		return 0x30;
+	case USB_BRIDGE_RMNET:
+		return 0x50;
 	default:
 		return -EINVAL;
 	}
