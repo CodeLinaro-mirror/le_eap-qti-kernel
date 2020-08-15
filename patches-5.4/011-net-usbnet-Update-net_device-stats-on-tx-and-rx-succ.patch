@@ -1,0 +1,46 @@
+From 69ea2c2b8bf73603183a9ad24106df44b8dbd272 Mon Sep 17 00:00:00 2001
+From: Ajay Agarwal <ajaya@codeaurora.org>
+Date: Thu, 7 Mar 2019 15:09:14 +0530
+Subject: [PATCH] net: usbnet: Update net_device stats on tx and rx success
+
+Currently the driver does not update usbnet->net_device->stats
+tx and rx success case statistics in tx_complete and
+usbnet_skb_return. As a result, the net drivers having their own
+definiton for ndo_get_stats are not able to update success case
+stats leading to incomplete info in ifconfig command output.
+Fix this by also updating usbnet->net_device->stats on tx and rx
+success.
+
+Change-Id: I881343644c92d5031300edfa7340a503ab4cbf55
+Signed-off-by: Ajay Agarwal <ajaya@codeaurora.org>
+---
+ drivers/net/usb/usbnet.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/net/usb/usbnet.c b/drivers/net/usb/usbnet.c
+index 32fc69539126..e35903cb660d 100644
+--- a/drivers/net/usb/usbnet.c
++++ b/drivers/net/usb/usbnet.c
+@@ -329,7 +329,9 @@ void usbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
+ 
+ 	flags = u64_stats_update_begin_irqsave(&stats64->syncp);
+ 	stats64->rx_packets++;
++	dev->net->stats.rx_packets++;
+ 	stats64->rx_bytes += skb->len;
++	dev->net->stats.rx_bytes += skb->len;
+ 	u64_stats_update_end_irqrestore(&stats64->syncp, flags);
+ 
+ 	netif_dbg(dev, rx_status, dev->net, "< rx, len %zu, type 0x%x\n",
+@@ -1255,7 +1257,9 @@ static void tx_complete (struct urb *urb)
+ 
+ 		flags = u64_stats_update_begin_irqsave(&stats64->syncp);
+ 		stats64->tx_packets += entry->packets;
++		dev->net->stats.tx_packets += entry->packets;
+ 		stats64->tx_bytes += entry->length;
++		dev->net->stats.tx_bytes += entry->length;
+ 		u64_stats_update_end_irqrestore(&stats64->syncp, flags);
+ 	} else {
+ 		dev->net->stats.tx_errors++;
+-- 
+2.26.2
+
