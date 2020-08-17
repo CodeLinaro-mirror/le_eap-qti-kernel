@@ -26,6 +26,7 @@
 #include "rmnet_map.h"
 #include "rmnet_handlers.h"
 #include "rmnet_descriptor.h"
+#include "rmnet_sig.h"
 
 #include <linux/rmnet_qmi.h>
 #include <linux/qmi_rmnet.h>
@@ -364,6 +365,11 @@ __rmnet_map_ingress_handler(struct sk_buff *skb,
 		qmi_rmnet_work_maybe_restart(port);
 
 	rmnet_deliver_skb_list(&list, port);
+
+	/* Send active signal after skb was sent out */
+	if (port->data_format & RMNET_EGRESS_FORMAT_IP_ROUTE)
+		rmnet_active_check();
+
 	return;
 
 free_skb:
@@ -583,6 +589,10 @@ direct_xmit:
 	rmnet_vnd_tx_fixup(orig_dev, skb_len);
 
 	dev_queue_xmit(skb);
+	/* Send active signal after skb was sent out */
+	if (port->data_format & RMNET_EGRESS_FORMAT_IP_ROUTE)
+		rmnet_active_check();
+
 	return;
 
 drop:

@@ -8,4 +8,6 @@ rmnet-y		 += rmnet_handlers.o
 rmnet-y		 += rmnet_map_data.o
 rmnet-y		 += rmnet_map_command.o
 rmnet-y		 += rmnet_descriptor.o
+rmnet-y		 += rmnet_sig.o
+
 obj-$(CONFIG_QTI_RMNET) += rmnet.o
