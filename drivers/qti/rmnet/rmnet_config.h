@@ -70,6 +70,11 @@ struct rmnet_agg_page {
 	struct page *page;
 };
 
+struct rmnet_eth_hdr_info {
+	unsigned char src_mac_addr[MAX_ADDR_LEN];
+	unsigned char dst_mac_addr[MAX_ADDR_LEN];
+};
+
 /* One instance of this structure is instantiated for each real_dev associated
  * with rmnet.
  */
@@ -108,6 +113,9 @@ struct rmnet_port {
 	/* Descriptor pool */
 	spinlock_t desc_pool_lock;
 	struct rmnet_frag_descriptor_pool *frag_desc_pool;
+
+	/* MAC address info */
+	struct rmnet_eth_hdr_info eth_hdr;
 };
 
 extern struct rtnl_link_ops rmnet_link_ops;

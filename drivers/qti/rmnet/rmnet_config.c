@@ -53,6 +53,7 @@
 enum {
 	IFLA_RMNET_DFC_QOS = __IFLA_RMNET_MAX,
 	IFLA_RMNET_UL_AGG_PARAMS,
+	IFLA_RMNET_ETH,
 	__IFLA_RMNET_EXT_MAX,
 };
 
@@ -69,6 +70,9 @@ static const struct nla_policy rmnet_policy[__IFLA_RMNET_EXT_MAX] = {
 	[IFLA_RMNET_UL_AGG_PARAMS] = {
 		.len = sizeof(struct rmnet_egress_agg_params)
 	},
+	[IFLA_RMNET_ETH] = {
+                .len = sizeof(struct rmnet_eth_hdr_info)
+        },
 };
 
 int rmnet_is_real_dev_registered(const struct net_device *real_dev)
@@ -231,6 +235,14 @@ static int rmnet_newlink(struct net *src_net, struct net_device *dev,
 		memcpy(&port->egress_agg_params, agg_params,
 		       sizeof(port->egress_agg_params));
 		spin_unlock_irqrestore(&port->agg_lock, irq_flags);
+	}
+
+	if (data[IFLA_RMNET_ETH]) {
+		struct rmnet_eth_hdr_info *eth_hdr;
+
+		eth_hdr = nla_data(data[IFLA_RMNET_ETH]);
+		memcpy(&port->eth_hdr, eth_hdr,
+			sizeof(struct rmnet_eth_hdr_info));
 	}
 
 	return 0;
@@ -424,6 +436,14 @@ static int rmnet_changelink(struct net_device *dev, struct nlattr *tb[],
 									   agg_params->agg_count,
 									   agg_params->agg_features,
 									   agg_params->agg_time);
+	}
+
+	if (data[IFLA_RMNET_ETH]) {
+		struct rmnet_eth_hdr_info *eth_hdr;
+
+		eth_hdr = nla_data(data[IFLA_RMNET_ETH]);
+		memcpy(&port->eth_hdr, eth_hdr,
+			sizeof(struct rmnet_eth_hdr_info));
 	}
 
 	return 0;
