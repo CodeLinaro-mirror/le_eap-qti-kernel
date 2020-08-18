@@ -54,18 +54,22 @@ static const char * const
 };
 
 static void pcie_ssr_sel_power_case(void *ctrl, u32 powercase) {
-	switch (powercase) {
-	case PCIE_POWER_OFF:
-		SSR_DBG("\n\n SSR_debug:Processing turn off\n");
-		mhi_arch_pcie_ssr_ops_power_off(ctrl);
-		break;
-	case PCIE_POWER_ON:
-		SSR_DBG("\n\n SSR_debug:Processing turn on\n");
-		mhi_arch_pcie_ssr_ops_power_on(ctrl);
-		break;
-	default:
-		SSR_DBG("SSR_debug:Invalid powercase: %d.\n", powercase);
-		break;
+	if (!ctrl) {
+		pr_err("Error: No vaild mhi cntrl for pcie_ssr\n");
+	} else {
+		switch (powercase) {
+		case PCIE_POWER_OFF:
+			SSR_DBG("SSR_debug:Processing turn off\n");
+			mhi_arch_pcie_ssr_ops_power_off(ctrl);
+			break;
+		case PCIE_POWER_ON:
+			SSR_DBG("SSR_debug:Processing turn on\n");
+			mhi_arch_pcie_ssr_ops_power_on(ctrl);
+			break;
+		default:
+			SSR_DBG("SSR_debug:Invalid powercase: %d.\n", powercase);
+			break;
+		}
 	}
 }
 
