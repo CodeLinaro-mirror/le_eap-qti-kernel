@@ -388,6 +388,7 @@ rmnet_map_ingress_handler(struct sk_buff *skb,
 	int (*rmnet_perf_core_deaggregate)(struct sk_buff *skb,
 					   struct rmnet_port *port);
 
+#if IS_ENABLED(CONFIG_UML)
 	if (skb->dev->type == ARPHRD_ETHER) {
 		if (pskb_expand_head(skb, ETH_HLEN, 0, GFP_ATOMIC)) {
 			kfree_skb(skb);
@@ -396,6 +397,7 @@ rmnet_map_ingress_handler(struct sk_buff *skb,
 
 		skb_push(skb, ETH_HLEN);
 	}
+#endif
 
 	if (port->data_format & (RMNET_FLAGS_INGRESS_COALESCE |
 				 RMNET_FLAGS_INGRESS_MAP_CKSUMV5)) {
