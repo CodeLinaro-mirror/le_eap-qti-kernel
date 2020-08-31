@@ -133,6 +133,20 @@ int data_bridge_open(struct bridge *brdg);
 void data_bridge_close(unsigned int id);
 int data_bridge_write(unsigned int id, struct sk_buff *skb);
 int data_bridge_unthrottle_rx(unsigned int id);
+int ctrl_bridge_open(struct bridge *brdg);
+void ctrl_bridge_close(unsigned int id);
+int ctrl_bridge_write(unsigned int id, char *buf, size_t len);
+int ctrl_bridge_set_cbits(unsigned int id, unsigned int cbits);
+unsigned int ctrl_bridge_get_cbits_tohost(unsigned int id);
+
+/* defined in control bridge */
+int ctrl_bridge_init(void);
+void ctrl_bridge_exit(void);
+int ctrl_bridge_probe(struct usb_interface *ifc, struct usb_host_endpoint *ep,
+		char *name, int id);
+void ctrl_bridge_disconnect(unsigned int id);
+int ctrl_bridge_resume(unsigned int id);
+int ctrl_bridge_suspend(unsigned int id);
 
 #else
 
@@ -150,6 +164,31 @@ static inline int __maybe_unused data_bridge_write(unsigned int id,
 }
 
 static inline int __maybe_unused data_bridge_unthrottle_rx(unsigned int id)
+{
+	return -ENODEV;
+}
+
+static inline int __maybe_unused ctrl_bridge_open(struct bridge *brdg)
+{
+	return -ENODEV;
+}
+
+static inline void __maybe_unused ctrl_bridge_close(unsigned int id) { }
+
+static inline int __maybe_unused ctrl_bridge_write(unsigned int id,
+						char *data, size_t size)
+{
+	return -ENODEV;
+}
+
+static inline int __maybe_unused ctrl_bridge_set_cbits(unsigned int id,
+					unsigned int cbits)
+{
+	return -ENODEV;
+}
+
+static inline unsigned int __maybe_unused
+ctrl_bridge_get_cbits_tohost(unsigned int id)
 {
 	return -ENODEV;
 }
