@@ -23,6 +23,7 @@ struct arch_info {
 	struct mhi_dev *mhi_dev;
 	struct msm_bus_scale_pdata *msm_bus_pdata;
 	u32 bus_client;
+	struct msm_pcie_register_event pcie_reg_event;
 	struct pci_saved_state *pcie_state;
 	struct pci_saved_state *ref_pcie_state;
 };
@@ -45,6 +46,27 @@ static int mhi_arch_set_bus_request(struct mhi_controller *mhi_cntrl, int index)
 
 	/* default return success */
 	return 0;
+}
+
+static void mhi_arch_pci_link_state_cb(struct msm_pcie_notify *notify)
+{
+	struct mhi_controller *mhi_cntrl = notify->data;
+	struct mhi_dev *mhi_dev = mhi_controller_get_devdata(mhi_cntrl);
+	struct pci_dev *pci_dev = mhi_dev->pci_dev;
+
+	switch (notify->event) {
+	case MSM_PCIE_EVENT_WAKEUP:
+		MHI_LOG("Received PCIE_WAKE signal\n");
+
+		/* bring link out of d3cold */
+		if (mhi_dev->powered_on) {
+			pm_runtime_get(&pci_dev->dev);
+			pm_runtime_put_noidle(&pci_dev->dev);
+		}
+		break;
+	default:
+		MHI_LOG("Unhandled event 0x%x\n", notify->event);
+	}
 }
 
 int mhi_arch_link_off(struct mhi_controller *mhi_cntrl, bool graceful)
@@ -226,6 +248,8 @@ int mhi_arch_pcie_init(struct mhi_controller *mhi_cntrl)
 	int ret = 0;
 
 	if (!arch_info) {
+		struct msm_pcie_register_event *reg_event;
+
 		arch_info = devm_kzalloc(&mhi_dev->pci_dev->dev,
 					 sizeof(*arch_info), GFP_KERNEL);
 		if (!arch_info)
@@ -253,6 +277,18 @@ int mhi_arch_pcie_init(struct mhi_controller *mhi_cntrl)
 				return -EINVAL;
 			}
 		}
+
+		/* register with pcie rc for WAKE# or link state events */
+		reg_event = &arch_info->pcie_reg_event;
+		reg_event->events = MSM_PCIE_EVENT_WAKEUP;
+
+		reg_event->user = mhi_dev->pci_dev;
+		reg_event->callback = mhi_arch_pci_link_state_cb;
+		reg_event->notify.data = mhi_cntrl;
+		ret = msm_pcie_register_event(reg_event);
+		if (ret)
+			MHI_LOG(
+				"Failed to reg. for link up notification\n");
 	}
 	return ret;
 }
