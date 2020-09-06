@@ -77,6 +77,12 @@ do_unpack_extra () {
 	echo "#include \"eap_diag.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/fsl-imx8dx.dtsi
     fi
 
+    if [ -e ${S}/arch/arm64/boot/dts/freescale/imx8qxp.dtsi ]; then
+        echo "#include \"sa415m-mhi.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+        echo "#include \"sa515m-mhi.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+        echo "#include \"eap_diag.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+    fi
+
     if [ "${@d.getVar('LINUX_VERSION')[0:3]}" = "4.9" ]; then
         cd ${S}
         git apply ${WORKDIR}/eap-qti-kernel/patches-4.9/0001-mhi_bus-core-Add-support-for-MHI-host-interface.patch
