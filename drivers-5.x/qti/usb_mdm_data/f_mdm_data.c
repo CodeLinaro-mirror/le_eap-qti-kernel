@@ -65,7 +65,7 @@ module_param(mdm_data_pend_limit_with_bridge, uint, 0644);
 #define CH_OPENED 0
 #define CH_READY 1
 
-#define MAX_NOTIFY_SIZE sizeof(struct usb_cdc_notification)
+#define MAX_NOTIFY_SIZE 10 /* notification + 2 byres (for serial) */
 #define LOG2_STATUS_INTERVAL_MSEC 5
 
 static struct usb_interface_descriptor intf_in_only_desc = {
@@ -353,6 +353,7 @@ struct mdm_ctrl_port {
 	struct list_head	cpkt_resp_q;
 	unsigned long		cpkts_len;
 	unsigned long		notify_count;
+	bool			pending;
 
 	struct bridge		brdg;
 
@@ -419,7 +420,9 @@ static void mdm_data_free_requests(struct usb_ep *ep, struct list_head *head)
 static void mdm_ctrl_purge_responses(struct mdm_ctrl_port *port)
 {
 	struct mdm_ctrl_pkt	*cpkt;
+	unsigned long		flags;
 
+	spin_lock_irqsave(&port->port_lock, flags);
 	while (!list_empty(&port->cpkt_resp_q)) {
 		cpkt = list_entry(&port->cpkt_resp_q,
 					struct mdm_ctrl_pkt, list);
@@ -428,6 +431,7 @@ static void mdm_ctrl_purge_responses(struct mdm_ctrl_port *port)
 		kfree(cpkt);
 	}
 	port->notify_count = 0;
+	spin_unlock_irqrestore(&port->port_lock, flags);
 }
 
 static void mdm_ctrl_free_req(struct usb_ep *ep, struct usb_request *req)
@@ -461,6 +465,89 @@ static int mdm_data_alloc_requests(struct usb_ep *ep, struct list_head *head,
 	}
 
 	return 0;
+}
+
+static void mdm_ctrl_send_cbits_tohost(void *ctxt)
+{
+	struct mdm_ctrl_port *port = ctxt;
+	struct usb_ep *ep = port->notify;
+	struct usb_request *req;
+	struct usb_cdc_notification *event;
+	unsigned int *data = &port->cbits_tohost;
+	void *buf = NULL;
+	int status;
+	unsigned long flags;
+
+	spin_lock_irqsave(&port->port_lock, flags);
+	if (!port->notify_req) {
+		port->pending = true;
+		spin_unlock_irqrestore(&port->port_lock, flags);
+		return;
+	}
+
+	pr_debug("%s: Name:%s serial state: %04x\n",
+			__func__, port->port_name, port->cbits_tohost);
+	req = port->notify_req;
+	port->notify_req = NULL;
+	port->pending = false;
+	req->length = MAX_NOTIFY_SIZE;
+	event = req->buf;
+	/* Assign the pointer to the line state info */
+	buf = event + 1;
+	event->bmRequestType = USB_DIR_IN | USB_TYPE_CLASS
+				| USB_RECIP_INTERFACE;
+	event->bNotificationType = USB_CDC_NOTIFY_SERIAL_STATE;
+	event->wValue = cpu_to_le16(0);
+	event->wIndex = cpu_to_le16(&port->ifc_id);
+	event->wLength = cpu_to_le16(sizeof(unsigned int));
+	memcpy(buf, data, sizeof(unsigned int));
+
+	status = usb_ep_queue(ep, req, GFP_ATOMIC);
+	if (status < 0) {
+		pr_err("%s can't notify serial state, %d\n",
+				__func__, status);
+		port->notify_req = req;
+	}
+
+	spin_unlock_irqrestore(&port->port_lock, flags);
+}
+
+static void mdm_ctrl_status(void *ctxt, unsigned int ctrl_bits)
+{
+	struct mdm_ctrl_port	*port = ctxt;
+
+	pr_debug("%s - input control lines: dcd%c dsr%c break%c"
+		" ring%c framing%c parity%c overrun%c\n",
+		__func__, ctrl_bits & ACM_CTRL_DCD ? '+' : '-',
+		ctrl_bits & ACM_CTRL_DSR ? '+' : '-',
+		ctrl_bits & ACM_CTRL_BRK ? '+' : '-',
+		ctrl_bits & ACM_CTRL_RI  ? '+' : '-',
+		ctrl_bits & ACM_CTRL_FRAMING ? '+' : '-',
+		ctrl_bits & ACM_CTRL_PARITY ? '+' : '-',
+		ctrl_bits & ACM_CTRL_OVERRUN ? '+' : '-');
+
+	port->cbits_tohost = ctrl_bits;
+	mdm_ctrl_send_cbits_tohost(port);
+}
+
+static void mdm_complete_set_line_coding(struct usb_ep *ep,
+				struct usb_request *req)
+{
+	struct mdm_ctrl_port *port = ep->driver_data;
+
+	if (req->status != 0)
+		return;
+
+	/* normal completion */
+	if (req->actual != sizeof(port->port_line_coding)) {
+		pr_debug("%s: port(%s) short resp, len %d\n",
+			__func__, port->port_name, req->actual);
+		usb_ep_set_halt(ep);
+	} else {
+		struct usb_cdc_line_coding	*value = req->buf;
+
+		port->port_line_coding = *value;
+	}
 }
 
 static void mdm_data_unthrottle_tx(void *ctx)
@@ -503,6 +590,13 @@ static void mdm_ctrl_notify_complete(struct usb_ep *ep, struct usb_request *req)
 			break;
 
 		spin_lock_irqsave(&port->port_lock, flags);
+		port->notify_req = req;
+		if (port->pending) {
+			spin_unlock_irqrestore(&port->port_lock, flags);
+			mdm_ctrl_send_cbits_tohost(port);
+			break;
+		}
+
 		if (port->notify_count > 0) {
 			port->notify_count--;
 			if (port->notify_count == 0) {
@@ -1091,6 +1185,25 @@ mdm_ctrl_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 
 		ret = 0;
 		break;
+	/* SET_LINE_CODING ... just read and save what the host sends */
+	case ((USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE) << 8)
+			| USB_CDC_REQ_SET_LINE_CODING:
+		pr_debug("%s USB_CDC_REQ_SET_LINE_CODING\n", __func__);
+		if (w_length != sizeof(struct usb_cdc_line_coding))
+			goto invalid;
+
+		ret = w_length;
+		cdev->gadget->ep0->driver_data = port;
+		req->complete = mdm_complete_set_line_coding;
+		break;
+	/* GET_LINE_CODING ... return what host sent, or initial value */
+	case ((USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE) << 8)
+			| USB_CDC_REQ_GET_LINE_CODING:
+		pr_debug("%s USB_CDC_REQ_GET_LINE_CODING\n", __func__);
+		ret = min_t(unsigned int, w_length,
+					sizeof(struct usb_cdc_line_coding));
+		memcpy(req->buf, &port->port_line_coding, ret);
+		break;
 	default:
 
 invalid:
@@ -1197,6 +1310,7 @@ static void mdm_ctrl_connect_w(struct work_struct *w)
 		container_of(w, struct mdm_ctrl_port, connect_w);
 	int			ret;
 	unsigned long		flags;
+	unsigned int		cbits;
 
 	if (!port || !atomic_read(&port->connected) ||
 		!test_bit(CH_READY, &port->bridge_sts))
@@ -1219,6 +1333,12 @@ static void mdm_ctrl_connect_w(struct work_struct *w)
 		ctrl_bridge_set_cbits(port->brdg.ch_id, port->cbits_tomodem);
 
 	spin_unlock_irqrestore(&port->port_lock, flags);
+
+	cbits = ctrl_bridge_get_cbits_tohost(port->brdg.ch_id);
+	if (cbits & ACM_CTRL_DCD) {
+		port->cbits_tohost |= ACM_CTRL_DCD | ACM_CTRL_DSR;
+		mdm_ctrl_send_cbits_tohost(port);
+	}
 }
 
 static void mdm_data_connect_w(struct work_struct *w)
@@ -1345,26 +1465,31 @@ static int mdm_ctrl_remove(int id)
 	if (!req || !req->buf)
 		goto fail;
 
-	event = req->buf;
-	event->bmRequestType = USB_DIR_IN | USB_TYPE_CLASS
-				| USB_RECIP_INTERFACE;
-	event->bNotificationType = USB_CDC_NOTIFY_NETWORK_CONNECTION;
-	event->wValue = cpu_to_le16(0);
-	event->wIndex = cpu_to_le16(port->ifc_id);
-	event->wLength = cpu_to_le16(0);
+	if (id == USB_BRIDGE_SERIAL) {
+		port->cbits_tohost = 0;
+		mdm_ctrl_send_cbits_tohost(port);
+	} else if (id == USB_BRIDGE_RMNET) {
+		event = req->buf;
+		event->bmRequestType = USB_DIR_IN | USB_TYPE_CLASS
+					| USB_RECIP_INTERFACE;
+		event->bNotificationType = USB_CDC_NOTIFY_NETWORK_CONNECTION;
+		event->wValue = cpu_to_le16(0);
+		event->wIndex = cpu_to_le16(port->ifc_id);
+		event->wLength = cpu_to_le16(0);
 
-	ret = usb_ep_queue(port->notify, port->notify_req, GFP_ATOMIC);
-	if (ret < 0) {
-		pr_err("%s: notify ep enqueue error %d\n",
-				__func__, ret);
+		ret = usb_ep_queue(port->notify, port->notify_req, GFP_ATOMIC);
+		if (ret < 0) {
+			pr_err("%s: notify ep enqueue error %d\n",
+					__func__, ret);
+		}
 	}
 
+fail:
 	mdm_ctrl_purge_responses(port);
 	cancel_work_sync(&port->connect_w);
 	if (test_and_clear_bit(CH_OPENED, &port->bridge_sts))
 		ctrl_bridge_close(port->brdg.ch_id);
 
-fail:
 	clear_bit(CH_READY, &port->bridge_sts);
 
 	return 0;
@@ -1418,7 +1543,7 @@ static void mdm_data_port_deinit(struct mdm_data_port *port)
 }
 
 static int
-mdm_ctrl_port_init(struct mdm_ctrl_port *port, const char *port_name)
+mdm_ctrl_port_init(struct mdm_ctrl_port *port, const char *port_name, int id)
 {
 	strlcpy(port->port_name, port_name, MAX_INST_NAME_LEN);
 
@@ -1438,6 +1563,9 @@ mdm_ctrl_port_init(struct mdm_ctrl_port *port, const char *port_name)
 	port->brdg.name = port->port_name;
 	port->brdg.ctx = port;
 	port->brdg.ops.send_pkt = mdm_ctrl_receive;
+
+	if (id == USB_BRIDGE_SERIAL)
+		port->brdg.ops.send_cbits = mdm_ctrl_status;
 
 	return 0;
 }
@@ -1843,8 +1971,10 @@ static void mdm_data_unbind(struct usb_configuration *c, struct usb_function *f)
 	ctrl_port = mdm_ctrl_ports[port->id];
 	usb_free_all_descriptors(f);
 
-	if (ctrl_port->notify && ctrl_port->notify_req)
+	if (ctrl_port->notify && ctrl_port->notify_req) {
 		mdm_ctrl_free_req(ctrl_port->notify, ctrl_port->notify_req);
+		ctrl_port->notify_req = NULL;
+	}
 }
 
 static int mdm_data_bind(struct usb_configuration *c, struct usb_function *f)
@@ -1859,8 +1989,7 @@ static int mdm_data_bind(struct usb_configuration *c, struct usb_function *f)
 	struct mdm_data_port *port = func_to_port(f);
 	struct mdm_ctrl_port *ctrl_port;
 	struct usb_ep *ep;
-	int status;
-	int id;
+	int status, id, req_len;
 
 	pr_debug("%s: start binding port %pK\n", __func__, port);
 	port->cdev = c->cdev;
@@ -1926,8 +2055,13 @@ static int mdm_data_bind(struct usb_configuration *c, struct usb_function *f)
 		ss_notify_desc.bEndpointAddress =
 					fs_notify_desc.bEndpointAddress;
 
+		if (id == USB_BRIDGE_RMNET)
+			req_len = sizeof(struct usb_cdc_notification);
+		else if (id == USB_BRIDGE_SERIAL)
+			req_len = sizeof(struct usb_cdc_notification) + 2;
+
 		ctrl_port->notify_req = mdm_ctrl_alloc_req(ep,
-					sizeof(struct usb_cdc_notification),
+					req_len,
 					GFP_KERNEL);
 		if (IS_ERR(ctrl_port->notify_req)) {
 			pr_err("%s: unable to allocate memory for notify req\n",
@@ -1959,8 +2093,10 @@ static int mdm_data_bind(struct usb_configuration *c, struct usb_function *f)
 	return 0;
 
 fail:
-	if (ctrl_port->notify_req)
+	if (ctrl_port->notify_req) {
 		mdm_ctrl_free_req(ctrl_port->notify, ctrl_port->notify_req);
+		ctrl_port->notify_req = NULL;
+	}
 	if (ctrl_port->notify)
 		ctrl_port->notify->driver_data = NULL;
 	if (port->out)
@@ -2105,6 +2241,7 @@ mdm_data_set_alt(struct usb_function *f, unsigned int intf, unsigned int alt)
 		ctrl_port->to_host = 0;
 		ctrl_port->to_modem = 0;
 		ctrl_port->drp_cpkt_cnt = 0;
+		ctrl_port->pending = false;
 
 		spin_unlock_irqrestore(&ctrl_port->port_lock, flags);
 
@@ -2246,7 +2383,7 @@ mdm_data_set_inst_name(struct usb_function_instance *fi, const char *name)
 	}
 
 	opts->ctrl = mdm_ctrl_ports[id];
-	ret = mdm_ctrl_port_init(opts->ctrl, name);
+	ret = mdm_ctrl_port_init(opts->ctrl, name, id);
 	if (ret) {
 		pr_err("%s: Unable to initialize ctrl inst %s\n",
 			__func__, name);
