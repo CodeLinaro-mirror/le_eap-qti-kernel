@@ -998,7 +998,7 @@ static const struct usb_device_id bridge_ids[] = {
 	.driver_info = (kernel_ulong_t)("dpl"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x910A, 3),
 	.driver_info = (kernel_ulong_t)("qdss"), },
-	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x910B, 0),
+	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x910B, 2),
 	.driver_info = (kernel_ulong_t)("dpl"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x910C, 1),
 	.driver_info = (kernel_ulong_t)("dpl"), },
