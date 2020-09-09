@@ -20,6 +20,7 @@
 #include <linux/debugfs.h>
 #include <linux/bitops.h>
 #include <linux/termios.h>
+#include <linux/usb/cdc.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/usb/mdm_data_bridge.h>
@@ -64,6 +65,9 @@ module_param(mdm_data_pend_limit_with_bridge, uint, 0644);
 #define CH_OPENED 0
 #define CH_READY 1
 
+#define MAX_NOTIFY_SIZE sizeof(struct usb_cdc_notification)
+#define LOG2_STATUS_INTERVAL_MSEC 5
+
 static struct usb_interface_descriptor intf_in_only_desc = {
 	.bLength            =	sizeof(intf_in_only_desc),
 	.bDescriptorType    =	USB_DT_INTERFACE,
@@ -82,6 +86,15 @@ static struct usb_interface_descriptor intf_desc = {
 	/* .bInterfaceProtocol = DYNAMIC */
 };
 
+static struct usb_interface_descriptor intf_data_ctrl_desc = {
+	.bLength            =	sizeof(intf_data_ctrl_desc),
+	.bDescriptorType    =	USB_DT_INTERFACE,
+	.bNumEndpoints      =	3,
+	.bInterfaceClass    =	USB_CLASS_VENDOR_SPEC,
+	.bInterfaceSubClass =	USB_SUBCLASS_VENDOR_SPEC,
+	/* .bInterfaceProtocol = DYNAMIC */
+};
+
 static struct usb_endpoint_descriptor hs_bulk_in_desc = {
 	.bLength          =	USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType  =	USB_DT_ENDPOINT,
@@ -90,6 +103,7 @@ static struct usb_endpoint_descriptor hs_bulk_in_desc = {
 	.wMaxPacketSize   =	cpu_to_le16(512),
 	.bInterval        =	0,
 };
+
 static struct usb_endpoint_descriptor fs_bulk_in_desc = {
 	.bLength          =	USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType  =	USB_DT_ENDPOINT,
@@ -151,6 +165,43 @@ static struct usb_ss_ep_comp_descriptor ss_bulk_out_comp_desc = {
 	/* .bmAttributes =	0, */
 };
 
+static struct usb_endpoint_descriptor fs_notify_desc = {
+	.bLength          =	USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType  =	USB_DT_ENDPOINT,
+	.bEndpointAddress =	USB_DIR_IN,
+	.bmAttributes     =	USB_ENDPOINT_XFER_INT,
+	.wMaxPacketSize   =	cpu_to_le16(MAX_NOTIFY_SIZE),
+	.bInterval        =	1 << LOG2_STATUS_INTERVAL_MSEC,
+};
+
+static struct usb_endpoint_descriptor hs_notify_desc  = {
+	.bLength          =	USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType  =	USB_DT_ENDPOINT,
+	.bEndpointAddress =	USB_DIR_IN,
+	.bmAttributes     =	USB_ENDPOINT_XFER_INT,
+	.wMaxPacketSize   =	cpu_to_le16(MAX_NOTIFY_SIZE),
+	.bInterval        =	LOG2_STATUS_INTERVAL_MSEC + 4,
+};
+
+static struct usb_endpoint_descriptor ss_notify_desc  = {
+	.bLength          =	USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType  =	USB_DT_ENDPOINT,
+	.bEndpointAddress =	USB_DIR_IN,
+	.bmAttributes     =	USB_ENDPOINT_XFER_INT,
+	.wMaxPacketSize   =	cpu_to_le16(MAX_NOTIFY_SIZE),
+	.bInterval        =	LOG2_STATUS_INTERVAL_MSEC + 4,
+};
+
+static struct usb_ss_ep_comp_descriptor ss_notify_comp_desc = {
+	.bLength         =	sizeof(ss_notify_comp_desc),
+	.bDescriptorType =	USB_DT_SS_ENDPOINT_COMP,
+
+	/* the following 3 values can be tweaked if necessary */
+	/* .bMaxBurst =		0, */
+	/* .bmAttributes =	0, */
+	.wBytesPerInterval =	cpu_to_le16(MAX_NOTIFY_SIZE),
+};
+
 static struct usb_descriptor_header *fs_in_only_desc[] = {
 	(struct usb_descriptor_header *) &intf_in_only_desc,
 	(struct usb_descriptor_header *) &fs_bulk_in_desc,
@@ -192,6 +243,33 @@ static struct usb_descriptor_header *ss_desc[] = {
 	NULL,
 };
 
+static struct usb_descriptor_header *int_fs_desc[] = {
+	(struct usb_descriptor_header *) &intf_data_ctrl_desc,
+	(struct usb_descriptor_header *) &fs_notify_desc,
+	(struct usb_descriptor_header *) &fs_bulk_in_desc,
+	(struct usb_descriptor_header *) &fs_bulk_out_desc,
+	NULL,
+};
+
+static struct usb_descriptor_header *int_hs_desc[] = {
+	(struct usb_descriptor_header *) &intf_data_ctrl_desc,
+	(struct usb_descriptor_header *) &hs_notify_desc,
+	(struct usb_descriptor_header *) &hs_bulk_in_desc,
+	(struct usb_descriptor_header *) &hs_bulk_out_desc,
+	NULL,
+};
+
+static struct usb_descriptor_header *int_ss_desc[] = {
+	(struct usb_descriptor_header *) &intf_data_ctrl_desc,
+	(struct usb_descriptor_header *) &ss_notify_desc,
+	(struct usb_descriptor_header *) &ss_notify_comp_desc,
+	(struct usb_descriptor_header *) &ss_bulk_in_desc,
+	(struct usb_descriptor_header *) &ss_bulk_in_comp_desc,
+	(struct usb_descriptor_header *) &ss_bulk_out_desc,
+	(struct usb_descriptor_header *) &ss_bulk_out_comp_desc,
+	NULL,
+};
+
 static struct usb_string mdm_data_string_defs[MAX_BRIDGE_DEVICES];
 
 static struct usb_gadget_strings mdm_data_string_table = {
@@ -214,6 +292,7 @@ struct mdm_data_port {
 	struct usb_ep		*out;
 	bool			in_ep;
 	bool			out_ep;
+	bool			int_ep;
 
 	/* data transfer queues */
 	unsigned int		tx_q_size;
@@ -237,6 +316,8 @@ struct mdm_data_port {
 
 	struct bridge		brdg;
 
+	int			id;
+
 	/*bridge status*/
 	unsigned long		bridge_sts;
 
@@ -253,18 +334,64 @@ struct mdm_data_port {
 	unsigned int		unthrottled_pnd_skbs;
 };
 
+struct mdm_ctrl_port {
+	spinlock_t		port_lock;
+	atomic_t		connected;
+
+	/* usb eps*/
+	struct usb_ep		*notify;
+	struct usb_request	*notify_req;
+
+	/* work queue*/
+	struct workqueue_struct	*wq;
+	struct work_struct	connect_w;
+	struct work_struct	disconnect_w;
+
+	char			port_name[MAX_INST_NAME_LEN];
+	int			ifc_id;
+
+	struct list_head	cpkt_resp_q;
+	unsigned long		cpkts_len;
+	unsigned long		notify_count;
+
+	struct bridge		brdg;
+
+	struct usb_cdc_line_coding	port_line_coding;
+
+	/* bridge status */
+	unsigned long		bridge_sts;
+
+	/* control bits */
+	unsigned int		cbits_tomodem;
+	unsigned int		cbits_tohost;
+
+	/* counters */
+	unsigned long		to_modem;
+	unsigned long		to_host;
+	unsigned long		drp_cpkt_cnt;
+};
+
 static struct mdm_data_port *mdm_data_ports[MAX_BRIDGE_DEVICES];
+static struct mdm_ctrl_port *mdm_ctrl_ports[MAX_BRIDGE_DEVICES];
 
 static inline struct mdm_data_port *func_to_port(struct usb_function *f)
 {
 	return container_of(f, struct mdm_data_port, function);
 }
 
+struct mdm_ctrl_pkt {
+	struct list_head	list;
+	void			*buf;
+	int			len;
+};
+
 struct mdm_data_opts {
 	struct usb_function_instance func_inst;
-	struct mdm_data_port *ctxt;
+	struct mdm_data_port *data;
+	struct mdm_ctrl_port *ctrl;
 	bool in_ep;
 	bool out_ep;
+	bool int_ep;
 
 	/*
 	 * Protect the data form concurrent access by read/write
@@ -287,6 +414,26 @@ static void mdm_data_free_requests(struct usb_ep *ep, struct list_head *head)
 		list_del(&req->list);
 		usb_ep_free_request(ep, req);
 	}
+}
+
+static void mdm_ctrl_purge_responses(struct mdm_ctrl_port *port)
+{
+	struct mdm_ctrl_pkt	*cpkt;
+
+	while (!list_empty(&port->cpkt_resp_q)) {
+		cpkt = list_entry(&port->cpkt_resp_q,
+					struct mdm_ctrl_pkt, list);
+		list_del(&cpkt->list);
+		kfree(cpkt->buf);
+		kfree(cpkt);
+	}
+	port->notify_count = 0;
+}
+
+static void mdm_ctrl_free_req(struct usb_ep *ep, struct usb_request *req)
+{
+	kfree(req->buf);
+	usb_ep_free_request(ep, req);
 }
 
 static int mdm_data_alloc_requests(struct usb_ep *ep, struct list_head *head,
@@ -331,6 +478,122 @@ static void mdm_data_unthrottle_tx(void *ctx)
 	queue_work(port->wq, &port->write_tomdm_w);
 	pr_debug("%s: port name =%s unthrottled\n", __func__,
 		port->port_name);
+}
+
+static void mdm_ctrl_notify_complete(struct usb_ep *ep, struct usb_request *req)
+{
+	struct mdm_ctrl_port	*port = req->context;
+	int			status = req->status;
+	unsigned long		flags;
+	struct mdm_ctrl_pkt	*cpkt;
+
+	switch (status) {
+	case -ECONNRESET:
+	case -ESHUTDOWN:
+		/* connection gone */
+		spin_lock_irqsave(&port->port_lock, flags);
+		port->notify_count = 0;
+		spin_unlock_irqrestore(&port->port_lock, flags);
+		break;
+	default:
+		pr_err("Notify ep error %d\n", status);
+		/* FALLTHROUGH */
+	case 0:
+		if (!atomic_read(&port->connected))
+			break;
+
+		spin_lock_irqsave(&port->port_lock, flags);
+		if (port->notify_count > 0) {
+			port->notify_count--;
+			if (port->notify_count == 0) {
+				spin_unlock_irqrestore(&port->port_lock, flags);
+				break;
+			}
+		} else {
+			pr_debug("%s: Invalid notify_count=%lu to decrement\n",
+					__func__, port->notify_count);
+			spin_unlock_irqrestore(&port->port_lock, flags);
+			break;
+		}
+		spin_unlock_irqrestore(&port->port_lock, flags);
+
+		status = usb_ep_queue(port->notify, req, GFP_ATOMIC);
+		if (status) {
+			spin_lock_irqsave(&port->port_lock, flags);
+			if (!list_empty(&port->cpkt_resp_q)) {
+				if (port->notify_count > 0) {
+					port->notify_count--;
+				} else {
+					pr_err("%s: Invalid notify_count=%lu to decrement\n",
+						__func__, port->notify_count);
+					spin_unlock_irqrestore(&port->port_lock,
+								flags);
+					break;
+				}
+				cpkt = list_first_entry(&port->cpkt_resp_q,
+						struct mdm_ctrl_pkt, list);
+				list_del(&cpkt->list);
+				kfree(cpkt->buf);
+				kfree(cpkt);
+			}
+			spin_unlock_irqrestore(&port->port_lock, flags);
+			pr_debug("ep enqueue error %d\n", status);
+		}
+		break;
+	}
+}
+
+static void mdm_ctrl_response_available(struct mdm_ctrl_port *port)
+{
+	struct usb_cdc_notification	*event;
+	int				ret;
+	unsigned long			flags;
+	struct usb_request		*req = port->notify_req;
+	struct mdm_ctrl_pkt		*cpkt;
+
+	pr_debug("%s: port:%pK\n", __func__, port);
+
+	spin_lock_irqsave(&port->port_lock, flags);
+	if (!req && !req->buf) {
+		spin_unlock_irqrestore(&port->port_lock, flags);
+		return;
+	}
+
+	if (++port->notify_count != 1) {
+		spin_unlock_irqrestore(&port->port_lock, flags);
+		return;
+	}
+
+	event = req->buf;
+	event->bmRequestType = USB_DIR_IN | USB_TYPE_CLASS
+				| USB_RECIP_INTERFACE;
+	event->bNotificationType = USB_CDC_NOTIFY_RESPONSE_AVAILABLE;
+	event->wValue = cpu_to_le16(0);
+	event->wIndex = cpu_to_le16(port->ifc_id);
+	event->wLength = cpu_to_le16(0);
+	spin_unlock_irqrestore(&port->port_lock, flags);
+
+	ret = usb_ep_queue(port->notify, port->notify_req, GFP_ATOMIC);
+	if (ret) {
+		spin_lock_irqsave(&port->port_lock, flags);
+		if (!list_empty(&port->cpkt_resp_q)) {
+			if (port->notify_count > 0)
+				port->notify_count--;
+			else {
+				pr_debug("%s: Invalid notify_count=%lu to decrement\n",
+					 __func__, port->notify_count);
+				spin_unlock_irqrestore(&port->port_lock, flags);
+				return;
+			}
+			cpkt = list_first_entry(&port->cpkt_resp_q,
+					struct mdm_ctrl_pkt, list);
+			list_del(&cpkt->list);
+			kfree(cpkt->buf);
+			kfree(cpkt);
+		}
+		spin_unlock_irqrestore(&port->port_lock, flags);
+		pr_debug("ep enqueue error %d\n", ret);
+	}
 }
 
 static void mdm_data_write_tohost(struct work_struct *w)
@@ -628,6 +891,26 @@ static void mdm_data_start_rx(struct mdm_data_port *port)
 	spin_unlock_irqrestore(&port->rx_lock, flags);
 }
 
+static struct usb_request *
+mdm_ctrl_alloc_req(struct usb_ep *ep, unsigned int len, gfp_t flags)
+{
+	struct usb_request *req;
+
+	req = usb_ep_alloc_request(ep, flags);
+	if (!req)
+		return ERR_PTR(-ENOMEM);
+
+	req->buf = kmalloc(len, flags);
+
+	if (!req->buf) {
+		usb_ep_free_request(ep, req);
+		return ERR_PTR(-ENOMEM);
+	}
+	req->length = len;
+
+	return req;
+}
+
 static void mdm_data_start_io(struct mdm_data_port *port)
 {
 	unsigned long	flags;
@@ -678,6 +961,264 @@ static void mdm_data_start_io(struct mdm_data_port *port)
 
 	/* queue out requests */
 	mdm_data_start_rx(port);
+}
+
+static void mdm_send_cbits_tomodem(void *ptr, unsigned int cbits)
+{
+	struct mdm_ctrl_port	*port = ptr;
+
+	pr_debug("%s: port:%pK\n", __func__, port);
+	if (cbits == port->cbits_tomodem)
+		return;
+
+	port->cbits_tomodem = cbits;
+
+	if (!test_bit(CH_OPENED, &port->bridge_sts))
+		return;
+
+	pr_debug("%s: cbits_tomodem:%d DTR:%d  RST:%d\n", __func__, cbits,
+		cbits & ACM_CTRL_DTR  ? 1 : 0, cbits & ACM_CTRL_RTS ? 1 : 0);
+
+	ctrl_bridge_set_cbits(port->brdg.ch_id, cbits);
+}
+
+static int mdm_send_cpkt_tomodem(void *ptr, void *buf, size_t len)
+{
+	void *cbuf;
+	struct mdm_ctrl_port *port = ptr;
+
+	pr_debug("%s: port:%pK\n", __func__, port);
+	if (!port) {
+		pr_err("%s: port is null\n", __func__);
+		return 0;
+	}
+
+	if (!len && !buf)
+		return 0;
+
+	cbuf = kmalloc(len, GFP_ATOMIC);
+	if (!cbuf)
+		return -ENOMEM;
+
+	memcpy(cbuf, buf, len);
+
+	/* drop cpkt if ch is not open */
+	if (!test_bit(CH_OPENED, &port->bridge_sts)) {
+		port->drp_cpkt_cnt++;
+		kfree(cbuf);
+		return 0;
+	}
+
+	ctrl_bridge_write(port->brdg.ch_id, cbuf, len);
+
+	port->to_modem++;
+
+	return 0;
+}
+
+static void mdm_ctrl_cmd_complete(struct usb_ep *ep, struct usb_request *req)
+{
+	struct mdm_ctrl_port *port = req->context;
+
+	pr_debug("%s: mdm_ctrl_port: %pK\n", __func__, port);
+	if (!port) {
+		pr_err("%s: port is null\n", __func__);
+		return;
+	}
+
+	mdm_send_cpkt_tomodem(port, req->buf, req->actual);
+}
+
+static int
+mdm_ctrl_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
+{
+	struct mdm_ctrl_port		*port;
+	struct mdm_data_port		*data = func_to_port(f);
+	struct usb_composite_dev	*cdev = f->config->cdev;
+	struct usb_request		*req = cdev->req;
+	u16				w_index = le16_to_cpu(ctrl->wIndex);
+	u16				w_value = le16_to_cpu(ctrl->wValue);
+	u16				w_length = le16_to_cpu(ctrl->wLength);
+	int				ret = -EOPNOTSUPP;
+
+	pr_debug("%s: mdm_ctrl_port: %pK\n", __func__, port);
+
+	port = mdm_ctrl_ports[data->id];
+
+	switch ((ctrl->bRequestType << 8) | ctrl->bRequest) {
+	case ((USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE) << 8)
+			| USB_CDC_SEND_ENCAPSULATED_COMMAND:
+		pr_debug("%s: USB_CDC_SEND_ENCAPSULATED_COMMAND\n", __func__);
+		ret = w_length;
+		req->complete = mdm_ctrl_cmd_complete;
+		req->context = port;
+		break;
+	case ((USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE) << 8)
+			| USB_CDC_GET_ENCAPSULATED_RESPONSE:
+		pr_debug("%s: USB_CDC_GET_ENCAPSULATED_RESPONSE\n", __func__);
+		if (w_value) {
+			pr_err("%s: invalid w_value = %04x\n",
+				   __func__, w_value);
+			goto invalid;
+		} else {
+			unsigned int len;
+			struct mdm_ctrl_pkt *cpkt;
+
+			spin_lock(&port->port_lock);
+			if (list_empty(&port->cpkt_resp_q)) {
+				ret = 0;
+				spin_unlock(&port->port_lock);
+				goto invalid;
+			}
+
+			cpkt = list_first_entry(&port->cpkt_resp_q,
+					struct mdm_ctrl_pkt, list);
+			list_del(&cpkt->list);
+			spin_unlock(&port->port_lock);
+
+			len = min_t(unsigned int, w_length, cpkt->len);
+			memcpy(req->buf, cpkt->buf, len);
+			ret = len;
+			kfree(cpkt->buf);
+			kfree(cpkt);
+		}
+		break;
+	case ((USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE) << 8)
+			| USB_CDC_REQ_SET_CONTROL_LINE_STATE:
+		pr_debug("%s: USB_CDC_REQ_SET_CONTROL_LINE_STATE: DTR:%d\n",
+				__func__, w_value & ACM_CTRL_DTR ? 1 : 0);
+		mdm_send_cbits_tomodem(port, w_value);
+
+		ret = 0;
+		break;
+	default:
+
+invalid:
+		pr_err("%s:invalid control req%02x.%02x v%04x i%04x l%d\n",
+			ctrl->bRequestType, ctrl->bRequest,
+			w_value, w_index, w_length);
+	}
+
+	/* respond with data transfer or status phase? */
+	if (ret >= 0) {
+		req->zero = (ret < w_length);
+		req->length = ret;
+		ret = usb_ep_queue(cdev->gadget->ep0, req, GFP_ATOMIC);
+		if (ret < 0)
+			ERROR(cdev, "ep0 enqueue err %d\n", ret);
+	}
+
+	return ret;
+}
+
+static struct mdm_ctrl_pkt *alloc_ctrl_pkt(unsigned int len, gfp_t flags)
+{
+	struct mdm_ctrl_pkt *pkt;
+
+	pkt = kzalloc(sizeof(struct mdm_ctrl_pkt), flags);
+	if (!pkt)
+		return ERR_PTR(-ENOMEM);
+
+	pkt->buf = kmalloc(len, flags);
+	if (!pkt->buf) {
+		kfree(pkt);
+		return ERR_PTR(-ENOMEM);
+	}
+	pkt->len = len;
+
+	return pkt;
+}
+
+static int mdm_send_cpkt_response(void *ptr,
+				void *buf, size_t len)
+{
+	struct mdm_ctrl_port *port = ptr;
+	unsigned long flags;
+	struct mdm_ctrl_pkt *cpkt;
+
+	if (!buf && !len) {
+		pr_err("%s: zero sized length buffer\n", __func__);
+		return -ENODEV;
+	}
+
+	cpkt = alloc_ctrl_pkt(len, GFP_ATOMIC);
+	if (IS_ERR(cpkt)) {
+		pr_err("%s: unable to allocate the control pkt\n", __func__);
+		return -ENOMEM;
+	}
+	memcpy(cpkt->buf, buf, len);
+
+	if (!atomic_read(&port->connected)) {
+		kfree(cpkt->buf);
+		kfree(cpkt);
+		return 0;
+	}
+
+	spin_lock_irqsave(&port->port_lock, flags);
+	list_add_tail(&cpkt->list, &port->cpkt_resp_q);
+	spin_unlock_irqrestore(&port->port_lock, flags);
+
+	mdm_ctrl_response_available(port);
+
+	return 0;
+}
+
+static int mdm_ctrl_receive(void *dev, void *buf, size_t actual)
+{
+	struct mdm_ctrl_port	*port = dev;
+	int			retval = 0;
+
+	pr_debug_ratelimited("%s: read complete bytes read: %zu\n",
+			__func__, actual);
+
+	/* send it to USB here */
+	retval = mdm_send_cpkt_response(port, buf, actual);
+	port->to_host++;
+
+	return retval;
+}
+
+static void mdm_ctrl_disconnect_w(struct work_struct *w)
+{
+	struct mdm_ctrl_port	*port =
+			container_of(w, struct mdm_ctrl_port, disconnect_w);
+
+	if (!test_bit(CH_OPENED, &port->bridge_sts))
+		return;
+
+	/* send the dtr zero */
+	ctrl_bridge_close(port->brdg.ch_id);
+	clear_bit(CH_OPENED, &port->bridge_sts);
+}
+
+static void mdm_ctrl_connect_w(struct work_struct *w)
+{
+	struct mdm_ctrl_port	*port =
+		container_of(w, struct mdm_ctrl_port, connect_w);
+	int			ret;
+	unsigned long		flags;
+
+	if (!port || !atomic_read(&port->connected) ||
+		!test_bit(CH_READY, &port->bridge_sts))
+		return;
+
+	pr_debug("%s: port:%pK\n", __func__, port);
+
+	ret = ctrl_bridge_open(&port->brdg);
+	if (ret) {
+		pr_err("%s: unable open bridge ch:%d err:%d\n",
+				__func__, port->brdg.ch_id, ret);
+		return;
+	}
+
+	spin_lock_irqsave(&port->port_lock, flags);
+
+	set_bit(CH_OPENED, &port->bridge_sts);
+
+	if (port->cbits_tomodem)
+		ctrl_bridge_set_cbits(port->brdg.ch_id, port->cbits_tomodem);
+
+	spin_unlock_irqrestore(&port->port_lock, flags);
 }
 
 static void mdm_data_connect_w(struct work_struct *w)
@@ -748,6 +1289,22 @@ static void mdm_data_free_buffers(struct mdm_data_port *port)
 	spin_unlock_irqrestore(&port->rx_lock, flags);
 }
 
+static int mdm_ctrl_probe(int id)
+{
+	struct mdm_ctrl_port	*port;
+
+	port = mdm_ctrl_ports[id];
+
+	pr_debug("%s: port:%pK\n", __func__, port);
+
+	set_bit(CH_READY, &port->bridge_sts);
+
+	if (atomic_read(&port->connected))
+		queue_work(port->wq, &port->connect_w);
+
+	return 0;
+}
+
 static int mdm_data_probe(struct platform_device *pdev)
 {
 	struct mdm_data_port *port;
@@ -768,6 +1325,48 @@ static int mdm_data_probe(struct platform_device *pdev)
 	if (atomic_read(&port->connected))
 		queue_work(port->wq, &port->connect_w);
 
+	mdm_ctrl_probe(id);
+
+	return 0;
+}
+
+static int mdm_ctrl_remove(int id)
+{
+	struct mdm_ctrl_port *port;
+	struct usb_request	*req;
+	struct usb_cdc_notification *event;
+	int ret;
+
+	port = mdm_ctrl_ports[id];
+
+	pr_debug("%s: port:%pK\n", __func__, port);
+
+	req = port->notify_req;
+	if (!req || !req->buf)
+		goto fail;
+
+	event = req->buf;
+	event->bmRequestType = USB_DIR_IN | USB_TYPE_CLASS
+				| USB_RECIP_INTERFACE;
+	event->bNotificationType = USB_CDC_NOTIFY_NETWORK_CONNECTION;
+	event->wValue = cpu_to_le16(0);
+	event->wIndex = cpu_to_le16(port->ifc_id);
+	event->wLength = cpu_to_le16(0);
+
+	ret = usb_ep_queue(port->notify, port->notify_req, GFP_ATOMIC);
+	if (ret < 0) {
+		pr_err("%s: notify ep enqueue error %d\n",
+				__func__, ret);
+	}
+
+	mdm_ctrl_purge_responses(port);
+	cancel_work_sync(&port->connect_w);
+	if (test_and_clear_bit(CH_OPENED, &port->bridge_sts))
+		ctrl_bridge_close(port->brdg.ch_id);
+
+fail:
+	clear_bit(CH_READY, &port->bridge_sts);
+
 	return 0;
 }
 
@@ -775,8 +1374,6 @@ static int mdm_data_probe(struct platform_device *pdev)
 static int mdm_data_remove(struct platform_device *pdev)
 {
 	struct mdm_data_port *port;
-	struct usb_ep	*ep_in;
-	struct usb_ep	*ep_out;
 	int id;
 
 	pr_debug("%s: name:%s\n", __func__, pdev->name);
@@ -789,14 +1386,6 @@ static int mdm_data_remove(struct platform_device *pdev)
 
 	port = mdm_data_ports[id];
 
-	ep_in = port->in;
-	if (ep_in)
-		usb_ep_fifo_flush(ep_in);
-
-	ep_out = port->out;
-	if (ep_out)
-		usb_ep_fifo_flush(ep_out);
-
 	/* cancel pending writes to MDM */
 	cancel_work_sync(&port->write_tomdm_w);
 
@@ -808,7 +1397,14 @@ static int mdm_data_remove(struct platform_device *pdev)
 	clear_bit(CH_READY, &port->bridge_sts);
 	clear_bit(RX_THROTTLED, &port->brdg.flags);
 
+	mdm_ctrl_remove(id);
+
 	return 0;
+}
+
+static void mdm_ctrl_port_deinit(struct mdm_ctrl_port *port)
+{
+	destroy_workqueue(port->wq);
 }
 
 static void mdm_data_port_deinit(struct mdm_data_port *port)
@@ -819,6 +1415,31 @@ static void mdm_data_port_deinit(struct mdm_data_port *port)
 		platform_driver_unregister(pdrv);
 
 	destroy_workqueue(port->wq);
+}
+
+static int
+mdm_ctrl_port_init(struct mdm_ctrl_port *port, const char *port_name)
+{
+	strlcpy(port->port_name, port_name, MAX_INST_NAME_LEN);
+
+	port->wq = create_singlethread_workqueue(port->port_name);
+	if (!port->wq) {
+		pr_err("%s: Unable to create workqueue:%s\n",
+						__func__, port->port_name);
+		return -ENOMEM;
+	}
+
+	spin_lock_init(&port->port_lock);
+
+	INIT_WORK(&port->connect_w, mdm_ctrl_connect_w);
+	INIT_WORK(&port->disconnect_w, mdm_ctrl_disconnect_w);
+	INIT_LIST_HEAD(&port->cpkt_resp_q);
+
+	port->brdg.name = port->port_name;
+	port->brdg.ctx = port;
+	port->brdg.ops.send_pkt = mdm_ctrl_receive;
+
+	return 0;
 }
 
 static int mdm_data_port_init(struct mdm_data_port *port, const char *port_name)
@@ -866,6 +1487,107 @@ static int mdm_data_port_init(struct mdm_data_port *port, const char *port_name)
 
 #if defined(CONFIG_DEBUG_FS)
 #define DEBUG_DATA_BUF_SIZE 4096
+
+static ssize_t mdm_ctrl_read_stats(struct file *file, char __user *ubuf,
+		size_t count, loff_t *ppos)
+{
+	struct mdm_ctrl_port	*port;
+	char			*buf;
+	unsigned long		flags;
+	int			ret;
+	int			i;
+	int			temp = 0;
+
+	buf = kzalloc(sizeof(char) * DEBUG_DATA_BUF_SIZE, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	for (i = 0; i < MAX_BRIDGE_DEVICES; i++) {
+		port = mdm_ctrl_ports[i];
+		if (!port->notify)
+			continue;
+
+		spin_lock_irqsave(&port->port_lock, flags);
+		temp += scnprintf(buf + temp, DEBUG_DATA_BUF_SIZE - temp,
+				"\nName:        %s\n"
+				"#PORT:%d port: %pK\n"
+				"to_usbhost:    %lu\n"
+				"to_modem:      %lu\n"
+				"cpkt_drp_cnt:  %lu\n"
+				"DTR:           %s\n"
+				"ch_open:       %d\n"
+				"ch_ready:      %d\n",
+				port->port_name,
+				i, port,
+				port->to_host, port->to_modem,
+				port->drp_cpkt_cnt,
+				port->cbits_tomodem ? "HIGH" : "LOW",
+				test_bit(CH_OPENED, &port->bridge_sts),
+				test_bit(CH_READY, &port->bridge_sts));
+		spin_unlock_irqrestore(&port->port_lock, flags);
+	}
+
+	ret = simple_read_from_buffer(ubuf, count, ppos, buf, temp);
+
+	kfree(buf);
+
+	return ret;
+}
+
+static ssize_t mdm_ctrl_reset_stats(struct file *file,
+	const char __user *buf, size_t count, loff_t *ppos)
+{
+	struct mdm_ctrl_port	*port;
+	int			i;
+	unsigned long		flags;
+
+	for (i = 0; i < MAX_BRIDGE_DEVICES; i++) {
+		port = mdm_ctrl_ports[i];
+		if (!port->notify)
+			continue;
+
+		spin_lock_irqsave(&port->port_lock, flags);
+		port->to_host = 0;
+		port->to_modem = 0;
+		port->drp_cpkt_cnt = 0;
+		spin_unlock_irqrestore(&port->port_lock, flags);
+	}
+	return count;
+}
+
+const struct file_operations mdm_ctrl_stats_ops = {
+	.read = mdm_ctrl_read_stats,
+	.write = mdm_ctrl_reset_stats,
+};
+
+struct dentry	*ctrl_dent;
+
+static void mdm_ctrl_debugfs_init(void)
+{
+	struct dentry	*ctrl_dfile;
+
+	ctrl_dent = debugfs_create_dir("usb_mdm_ctrl", NULL);
+	if (IS_ERR(ctrl_dent))
+		return;
+
+	ctrl_dfile =
+		debugfs_create_file("status", 0644, ctrl_dent, NULL,
+			&mdm_ctrl_stats_ops);
+	if (!ctrl_dfile || IS_ERR(ctrl_dfile))
+		goto error;
+
+	return;
+
+error:
+	debugfs_remove_recursive(ctrl_dent);
+	ctrl_dent = NULL;
+}
+
+static void mdm_ctrl_debugfs_exit(void)
+{
+	debugfs_remove_recursive(ctrl_dent);
+	ctrl_dent = NULL;
+}
 
 static unsigned int record_timestamp;
 module_param(record_timestamp, uint, 0644);
@@ -1101,6 +1823,8 @@ static void mdm_data_debugfs_exit(void)
 
 static void mdm_data_debugfs_init(void) { }
 static void mdm_data_debugfs_exit(void) { }
+static void mdm_ctrl_debugfs_init(void) { }
+static void mdm_ctrl_debugfs_exit(void) { }
 static void dbg_timestamp(char *event, struct sk_buff *skb) { }
 static unsigned int get_timestamp(void)
 {
@@ -1112,20 +1836,28 @@ static unsigned int get_timestamp(void)
 static void mdm_data_unbind(struct usb_configuration *c, struct usb_function *f)
 {
 	struct mdm_data_port *port = func_to_port(f);
+	struct mdm_ctrl_port *ctrl_port;
 
 	pr_debug("%s: start unbinding port %pK\n", __func__, port);
+
+	ctrl_port = mdm_ctrl_ports[port->id];
 	usb_free_all_descriptors(f);
+
+	if (ctrl_port->notify && ctrl_port->notify_req)
+		mdm_ctrl_free_req(ctrl_port->notify, ctrl_port->notify_req);
 }
 
 static int mdm_data_bind(struct usb_configuration *c, struct usb_function *f)
 {
 	bool out_desc = true;
+	bool int_desc = false;
 	struct usb_interface_descriptor *data_desc = &intf_desc;
 	struct usb_descriptor_header **fs_desc_hdr = fs_desc;
 	struct usb_descriptor_header **hs_desc_hdr = hs_desc;
 	struct usb_descriptor_header **ss_desc_hdr = ss_desc;
 	struct usb_composite_dev *cdev = c->cdev;
 	struct mdm_data_port *port = func_to_port(f);
+	struct mdm_ctrl_port *ctrl_port;
 	struct usb_ep *ep;
 	int status;
 	int id;
@@ -1139,18 +1871,21 @@ static int mdm_data_bind(struct usb_configuration *c, struct usb_function *f)
 		fs_desc_hdr = fs_in_only_desc;
 		hs_desc_hdr = hs_in_only_desc;
 		ss_desc_hdr = ss_in_only_desc;
+	} else if (port->int_ep) {
+		int_desc = true;
+		data_desc = &intf_data_ctrl_desc;
+		fs_desc_hdr = int_fs_desc;
+		hs_desc_hdr = int_hs_desc;
+		ss_desc_hdr = int_ss_desc;
 	} else if (!port->in_ep) {
 		pr_err("%s: IN endpoint absent, invalid usecase!\n", __func__);
 		return -EINVAL;
 	}
 
-	id = bridge_name_to_id(port->port_name);
-	if (id < 0) {
-		pr_err("%s: Invalid port\n", __func__);
-		return -EINVAL;
-	}
-
+	id = port->id;
+	ctrl_port = mdm_ctrl_ports[id];
 	data_desc->bInterfaceNumber = usb_interface_id(c, f);
+	ctrl_port->ifc_id = data_desc->bInterfaceNumber;
 
 	status = bridge_id_to_protocol(id);
 	if (status < 0) {
@@ -1179,6 +1914,30 @@ static int mdm_data_bind(struct usb_configuration *c, struct usb_function *f)
 	ss_bulk_in_desc.bEndpointAddress =
 				fs_bulk_in_desc.bEndpointAddress;
 
+	if (int_desc) {
+		ep = usb_ep_autoconfig(cdev->gadget, &fs_notify_desc);
+		if (!ep)
+			goto fail;
+
+		ctrl_port->notify = ep;
+		ep->driver_data = cdev;
+		hs_notify_desc.bEndpointAddress =
+					fs_notify_desc.bEndpointAddress;
+		ss_notify_desc.bEndpointAddress =
+					fs_notify_desc.bEndpointAddress;
+
+		ctrl_port->notify_req = mdm_ctrl_alloc_req(ep,
+					sizeof(struct usb_cdc_notification),
+					GFP_KERNEL);
+		if (IS_ERR(ctrl_port->notify_req)) {
+			pr_err("%s: unable to allocate memory for notify req\n",
+					__func__);
+			goto fail;
+		}
+		ctrl_port->notify_req->complete = mdm_ctrl_notify_complete;
+		ctrl_port->notify_req->context = ctrl_port;
+	}
+
 	if (out_desc) {
 		ep = usb_ep_autoconfig(cdev->gadget, &fs_bulk_out_desc);
 		if (!ep)
@@ -1200,21 +1959,29 @@ static int mdm_data_bind(struct usb_configuration *c, struct usb_function *f)
 	return 0;
 
 fail:
+	if (ctrl_port->notify_req)
+		mdm_ctrl_free_req(ctrl_port->notify, ctrl_port->notify_req);
+	if (ctrl_port->notify)
+		ctrl_port->notify->driver_data = NULL;
 	if (port->out)
 		port->out->driver_data = NULL;
 	if (port->in)
 		port->in->driver_data = NULL;
 
 	pr_err("%s: can't bind, err %d\n", __func__, status);
+
 	return status;
 }
 
 static void mdm_data_disable(struct usb_function *f)
 {
 	struct mdm_data_port *port = func_to_port(f);
+	struct mdm_ctrl_port *ctrl_port;
 	unsigned long flags;
 
 	pr_debug("%s: Disabling\n", __func__);
+
+	ctrl_port = mdm_ctrl_ports[port->id];
 
 	mdm_data_free_buffers(port);
 	usb_ep_disable(port->in);
@@ -1236,17 +2003,29 @@ static void mdm_data_disable(struct usb_function *f)
 	spin_unlock_irqrestore(&port->rx_lock, flags);
 
 	queue_work(port->wq, &port->disconnect_w);
+	if (ctrl_port->notify) {
+		usb_ep_disable(ctrl_port->notify);
+		ctrl_port->notify->driver_data = NULL;
+		mdm_ctrl_purge_responses(ctrl_port);
+
+		atomic_set(&ctrl_port->connected, 0);
+
+		queue_work(port->wq, &ctrl_port->disconnect_w);
+	}
 }
 
 static int
 mdm_data_set_alt(struct usb_function *f, unsigned int intf, unsigned int alt)
 {
 	struct mdm_data_port *port = func_to_port(f);
+	struct mdm_ctrl_port *ctrl_port;
 	struct usb_composite_dev *cdev = f->config->cdev;
 	unsigned long flags;
 	int ret = 0;
 
 	pr_debug("%s: mdm_data_port: %pK\n", __func__, port);
+
+	ctrl_port = mdm_ctrl_ports[port->id];
 
 	port->tx_q_size = mdm_data_tx_q_size;
 	port->rx_q_size = mdm_data_rx_q_size;
@@ -1300,6 +2079,38 @@ mdm_data_set_alt(struct usb_function *f, unsigned int intf, unsigned int alt)
 
 	queue_work(port->wq, &port->connect_w);
 
+	if (ctrl_port->notify) {
+		ret = config_ep_by_speed(cdev->gadget, f, ctrl_port->notify);
+		if (ret) {
+			ctrl_port->notify->desc = NULL;
+			usb_ep_disable(port->in);
+			if (port->out)
+				usb_ep_disable(port->out);
+			return -EINVAL;
+		}
+		ctrl_port->notify->driver_data = ctrl_port;
+		ret = usb_ep_enable(ctrl_port->notify);
+		if (ret) {
+			ERROR(port->cdev, "can't enable %s, result %d\n",
+						ctrl_port->notify->name, ret);
+			usb_ep_disable(port->in);
+			if (port->out)
+				usb_ep_disable(port->out);
+			return ret;
+		}
+		atomic_set(&ctrl_port->connected, 1);
+
+		spin_lock_irqsave(&ctrl_port->port_lock, flags);
+		ctrl_port->cbits_tomodem = 0;
+		ctrl_port->to_host = 0;
+		ctrl_port->to_modem = 0;
+		ctrl_port->drp_cpkt_cnt = 0;
+
+		spin_unlock_irqrestore(&ctrl_port->port_lock, flags);
+
+		queue_work(ctrl_port->wq, &ctrl_port->connect_w);
+	}
+
 	return ret;
 }
 
@@ -1320,19 +2131,21 @@ usb_function *mdm_data_bind_config(struct usb_function_instance *fi)
 	struct usb_function *f;
 
 	opts = container_of(fi, struct mdm_data_opts, func_inst);
-	f = &opts->ctxt->function;
+	f = &opts->data->function;
 
 	mutex_lock(&opts->lock);
-	opts->ctxt->in_ep = opts->in_ep;
-	opts->ctxt->out_ep = opts->out_ep;
+	opts->data->in_ep = opts->in_ep;
+	opts->data->out_ep = opts->out_ep;
+	opts->data->int_ep = opts->int_ep;
 	++opts->refcnt;
 	mutex_unlock(&opts->lock);
 
-	f->name = opts->ctxt->port_name;
+	f->name = opts->data->port_name;
 	f->strings = mdm_data_strings;
 	f->bind = mdm_data_bind;
 	f->unbind = mdm_data_unbind;
 	f->set_alt = mdm_data_set_alt;
+	f->setup = mdm_ctrl_setup;
 	f->disable = mdm_data_disable;
 	f->free_func = mdm_data_free;
 
@@ -1398,10 +2211,12 @@ CONFIGFS_ATTR(f_mdm_data_, name)
 
 MDM_DATA_BOOL_ATTRIBUTE(in_ep);
 MDM_DATA_BOOL_ATTRIBUTE(out_ep);
+MDM_DATA_BOOL_ATTRIBUTE(int_ep);
 
 static struct configfs_attribute *mdm_data_attrs[] = {
 	&f_mdm_data_attr_in_ep,
 	&f_mdm_data_attr_out_ep,
+	&f_mdm_data_attr_int_ep,
 	NULL,
 };
 
@@ -1430,10 +2245,20 @@ mdm_data_set_inst_name(struct usb_function_instance *fi, const char *name)
 		return -EINVAL;
 	}
 
-	opts->ctxt = mdm_data_ports[id];
-	ret = mdm_data_port_init(opts->ctxt, name);
+	opts->ctrl = mdm_ctrl_ports[id];
+	ret = mdm_ctrl_port_init(opts->ctrl, name);
+	if (ret) {
+		pr_err("%s: Unable to initialize ctrl inst %s\n",
+			__func__, name);
+		return ret;
+	}
+
+	opts->data = mdm_data_ports[id];
+	opts->data->id = id;
+	ret = mdm_data_port_init(opts->data, name);
 	if (ret) {
 		pr_err("%s: Unable to initialize inst %s\n", __func__, name);
+		mdm_ctrl_port_deinit(opts->ctrl);
 		return ret;
 	}
 
@@ -1445,8 +2270,8 @@ static void mdm_data_free_inst(struct usb_function_instance *f)
 	struct mdm_data_opts *opts;
 
 	opts = container_of(f, struct mdm_data_opts, func_inst);
-	mdm_data_port_deinit(opts->ctxt);
-	kfree(opts->ctxt);
+	mdm_data_port_deinit(opts->data);
+	mdm_ctrl_port_deinit(opts->ctrl);
 	mutex_destroy(&opts->lock);
 	kfree(opts);
 }
@@ -1460,7 +2285,7 @@ static struct usb_function_instance *mdm_data_alloc_inst(void)
 		return ERR_PTR(-ENOMEM);
 
 	mutex_init(&opts->lock);
-	opts->in_ep = opts->out_ep = false;
+	opts->in_ep = opts->out_ep = opts->int_ep = false;
 	opts->func_inst.set_inst_name = mdm_data_set_inst_name;
 	opts->func_inst.free_func_inst = mdm_data_free_inst;
 	config_group_init_type_name(&opts->func_inst.group, "",
@@ -1476,11 +2301,57 @@ static struct usb_function *mdm_data_alloc(struct usb_function_instance *fi)
 
 DECLARE_USB_FUNCTION(mdm_data, mdm_data_alloc_inst, mdm_data_alloc);
 
+static int mdm_ctrl_init(void)
+{
+	struct mdm_ctrl_port *ctrl_dev;
+	int num_instances = 0;
+	int ret, i;
+
+	for (i = 0; i < MAX_BRIDGE_DEVICES; i++) {
+		ctrl_dev = kzalloc(sizeof(*ctrl_dev), GFP_KERNEL);
+		if (!ctrl_dev) {
+			ret = -ENOMEM;
+			goto ctrl_free;
+		}
+		num_instances++;
+		mdm_ctrl_ports[i] = ctrl_dev;
+	}
+
+	mdm_ctrl_debugfs_init();
+
+	return 0;
+
+ctrl_free:
+	for (i = 0; i < num_instances; i++) {
+		ctrl_dev = mdm_ctrl_ports[i];
+		kfree(ctrl_dev);
+		mdm_ctrl_ports[i] = NULL;
+	}
+
+	return 0;
+}
+
+static void mdm_ctrl_exit(void)
+{
+	struct mdm_ctrl_port *ctrl_dev;
+	int i;
+
+	for (i = 0; i < MAX_BRIDGE_DEVICES; i++) {
+		ctrl_dev = mdm_ctrl_ports[i];
+		kfree(ctrl_dev);
+		mdm_ctrl_ports[i] = NULL;
+	}
+
+	mdm_ctrl_debugfs_exit();
+}
+
 static int __init mdm_data_init(void)
 {
 	struct mdm_data_port *dev;
 	int ret, i;
 	int num_instances = 0;
+
+	mdm_ctrl_init();
 
 	for (i = 0; i < MAX_BRIDGE_DEVICES; i++) {
 		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
@@ -1510,6 +2381,8 @@ dev_free:
 		mdm_data_ports[i] = NULL;
 	}
 
+	mdm_ctrl_exit();
+
 	return ret;
 }
 
@@ -1525,6 +2398,8 @@ static void __exit mdm_data_exit(void)
 		kfree(dev);
 		mdm_data_ports[i] = NULL;
 	}
+
+	mdm_ctrl_exit();
 }
 
 module_init(mdm_data_init);
