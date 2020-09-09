@@ -18,6 +18,8 @@
 #include <linux/skbuff.h>
 #include <linux/sizes.h>
 #include <linux/spinlock.h>
+#include <linux/version.h>
+#include <linux/kthread.h>
 #include <net/sock.h>
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0))
 #include <linux/sched.h>
