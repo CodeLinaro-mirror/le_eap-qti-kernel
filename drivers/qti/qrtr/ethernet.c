@@ -19,7 +19,11 @@
 #include <linux/sizes.h>
 #include <linux/spinlock.h>
 #include <net/sock.h>
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0))
+#include <linux/sched.h>
+#else
 #include <uapi/linux/sched/types.h>
+#endif
 
 #include <soc/qcom/qrtr_ethernet.h>
 #include "qrtr.h"
