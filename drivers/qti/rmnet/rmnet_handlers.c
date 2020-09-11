@@ -308,6 +308,8 @@ __rmnet_map_ingress_handler(struct sk_buff *skb,
 
 	if (port->data_format & RMNET_INGRESS_FORMAT_IP_ROUTE) {
 		rmnet_ip_route_rcv(skb, port);
+		/* Send active signal after skb was sent out */
+		rmnet_active_check();
 		return;
 	}
 
@@ -365,10 +367,6 @@ __rmnet_map_ingress_handler(struct sk_buff *skb,
 		qmi_rmnet_work_maybe_restart(port);
 
 	rmnet_deliver_skb_list(&list, port);
-
-	/* Send active signal after skb was sent out */
-	if (port->data_format & RMNET_EGRESS_FORMAT_IP_ROUTE)
-		rmnet_active_check();
 
 	return;
 
@@ -591,8 +589,9 @@ direct_xmit:
 	rmnet_vnd_tx_fixup(orig_dev, skb_len);
 
 	dev_queue_xmit(skb);
-	/* Send active signal after skb was sent out */
-	if (port->data_format & RMNET_EGRESS_FORMAT_IP_ROUTE)
+	/* Send active signal after v2x skb is sent out */
+	if (port->data_format & RMNET_EGRESS_FORMAT_IP_ROUTE ||
+	    port->data_format & RMNET_EGRESS_FORMAT_ETH)
 		rmnet_active_check();
 
 	return;
