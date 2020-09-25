@@ -58,8 +58,11 @@ static void qcom_mhi_qrtr_dl_callback(struct mhi_device *mhi_dev,
 
 	rc = qrtr_endpoint_post(&qdev->ep, mhi_res->buf_addr,
 				mhi_res->bytes_xferd);
-	if (rc == -EINVAL)
-		dev_err(qdev->dev, "invalid ipcrouter packet\n");
+	if (rc == -EINVAL) {
+		pr_err("qrtr::%s invalid ipcrouter packet, len:%d buf:%x\n",
+			__func__, mhi_res->bytes_xferd, mhi_res->buf_addr);
+		BUG();
+	}
 }
 
 /* from mhi to qrtr */
