@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -399,6 +399,7 @@ struct sk_buff *rmnet_map_deaggregate(struct sk_buff *skb,
 				     packet_len);
 		skbn->data_len += packet_len;
 		skbn->len += packet_len;
+		skbn->truesize += packet_len;
 	} else {
 		skbn = alloc_skb(packet_len + RMNET_MAP_DEAGGR_SPACING,
 				 GFP_ATOMIC);
