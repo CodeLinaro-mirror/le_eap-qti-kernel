@@ -1,0 +1,54 @@
+From a3fcda34e44de09182df73b723091a08c15a0214 Mon Sep 17 00:00:00 2001
+From: Ajay Agarwal <ajaya@codeaurora.org>
+Date: Thu, 8 Oct 2020 02:14:22 +0530
+Subject: [PATCH] net: usbnet: Update net_device stats for RmNet device only
+
+'Commit 69ea2c2b8bf7 ("net: usbnet: Update net_device stats on tx
+and rx success")' updated net_device->stats as well to reflect
+proper transfer values for netdevices having their own definition
+of get_stats. But this is doubling the ifconfig values for
+traditional netdevs like ECM which use usbnet_get_stats64.
+Fix this by updating dev->net->stats only for devices which use
+separate ndo_get_stats function.
+
+Signed-off-by: Ajay Agarwal <ajaya@codeaurora.org>
+Change-Id: Id42c4c53b61756d37d0dda351dd585d5cefc9a0f
+---
+ drivers/net/usb/usbnet.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/net/usb/usbnet.c b/drivers/net/usb/usbnet.c
+index df99787..9245cae7 100644
+--- a/drivers/net/usb/usbnet.c
++++ b/drivers/net/usb/usbnet.c
+@@ -378,9 +378,11 @@ void usbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
+ 
+ 	flags = u64_stats_update_begin_irqsave(&stats64->syncp);
+ 	stats64->rx_packets++;
+-	dev->net->stats.rx_packets++;
+ 	stats64->rx_bytes += skb->len;
+-	dev->net->stats.rx_bytes += skb->len;
++	if (dev->net->netdev_ops->ndo_get_stats) {
++		dev->net->stats.rx_packets++;
++		dev->net->stats.rx_bytes += skb->len;
++	}
+ 	u64_stats_update_end_irqrestore(&stats64->syncp, flags);
+ 
+ 	netif_dbg(dev, rx_status, dev->net, "< rx, len %zu, type 0x%x\n",
+@@ -1337,9 +1339,11 @@ static void tx_complete (struct urb *urb)
+ 
+ 		flags = u64_stats_update_begin_irqsave(&stats64->syncp);
+ 		stats64->tx_packets += entry->packets;
+-		dev->net->stats.tx_packets += entry->packets;
+ 		stats64->tx_bytes += entry->length;
+-		dev->net->stats.tx_bytes += entry->length;
++		if (dev->net->netdev_ops->ndo_get_stats) {
++			dev->net->stats.tx_packets += entry->packets;
++			dev->net->stats.tx_bytes += entry->length;
++		}
+ 		u64_stats_update_end_irqrestore(&stats64->syncp, flags);
+ 	} else {
+ 		dev->net->stats.tx_errors++;
+-- 
+2.7.4
+

@@ -101,6 +101,7 @@ do_unpack_extra () {
         git apply ${WORKDIR}/eap-qti-kernel/patches-4.14/0004-Add-support-for-upstream-rmnet-driver.patch
         git apply ${WORKDIR}/eap-qti-kernel/patches-4.14/0005-net-cdc_ether-Ensure-that-default-MTU-is-minimum-204.patch
         git apply ${WORKDIR}/eap-qti-kernel/patches-4.14/0006-net-usbnet-Update-net_device-stats-on-tx-and-rx-succ.patch
+        git apply ${WORKDIR}/eap-qti-kernel/patches-4.14/0007-net-usbnet-Update-net_device-stats-for-RmNet-device-.patch
         cd -
     elif [ "${@d.getVar('LINUX_VERSION')[0:3]}" = "5.4" ]; then
         cd ${S}
@@ -112,6 +113,7 @@ do_unpack_extra () {
        git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/009-mhi_bus-core-Add-support-for-MHI-host-interface.patch
        git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/010-net-cdc_ether-Ensure-that-default-MTU-is-minimum-204.patch
        git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/011-net-usbnet-Update-net_device-stats-on-tx-and-rx-succ.patch
+       git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/012-net-usbnet-Update-net_device-stats-for-RmNet-device-.patch
        cd -
     else
         bbfatal "Kernel version ${LINUX_VERSION} is not supported"
