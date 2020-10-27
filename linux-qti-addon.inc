@@ -114,6 +114,7 @@ do_unpack_extra () {
         git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/010-net-cdc_ether-Ensure-that-default-MTU-is-minimum-204.patch
         git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/011-net-usbnet-Update-net_device-stats-on-tx-and-rx-succ.patch
         git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/012-net-usbnet-Update-net_device-stats-for-RmNet-device-.patch
+        git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/013-usb-gadget-Fix-crash-on-calling-usb-gadget-activate-.patch
         cd -
     else
         bbfatal "Kernel version ${LINUX_VERSION} is not supported"
