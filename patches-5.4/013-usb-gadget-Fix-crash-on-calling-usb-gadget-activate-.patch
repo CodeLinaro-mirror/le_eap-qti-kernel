@@ -1,0 +1,53 @@
+From 0b10b86f515dadf34d2155925af1c06383f6f3ef Mon Sep 17 00:00:00 2001
+From: Aditya Mathur <aditmath@codeaurora.org>
+Date: Tue, 27 Oct 2020 13:37:32 -0700
+Subject: [PATCH] usb: gadget: Fix crash on calling usb gadget
+ activate/deactivate
+
+Currently the functions usb_gadget_activate and
+usb_gadget_deactivate are being called with spinlock held.
+The above functions calls gadget_pullup which invokes
+pm_runtime_get_sync call, which might sleep.
+This results in a crash. Fix this by releasing the
+spinlock and acquiring it after the function call.
+
+Change-Id: I17359e3c3227773a8ce269f8db93bc1d56771044
+Signed-off-by: Sriharsha Allenki <sallenki@codeaurora.org>
+Signed-off-by: Aditya Mathur <aditmath@codeaurora.org>
+---
+ drivers/usb/gadget/composite.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/usb/gadget/composite.c b/drivers/usb/gadget/composite.c
+index 5ec54b6..be15e54 100644
+--- a/drivers/usb/gadget/composite.c
++++ b/drivers/usb/gadget/composite.c
+@@ -348,8 +348,11 @@ int usb_function_deactivate(struct usb_function *function)
+ 
+ 	spin_lock_irqsave(&cdev->lock, flags);
+ 
+-	if (cdev->deactivations == 0)
++	if (cdev->deactivations == 0) {
++		spin_unlock_irqrestore(&cdev->lock, flags);
+ 		status = usb_gadget_deactivate(cdev->gadget);
++		spin_lock_irqsave(&cdev->lock, flags);
++	}
+ 	if (status == 0)
+ 		cdev->deactivations++;
+ 
+@@ -380,8 +383,11 @@ int usb_function_activate(struct usb_function *function)
+ 		status = -EINVAL;
+ 	else {
+ 		cdev->deactivations--;
+-		if (cdev->deactivations == 0)
++		if (cdev->deactivations == 0) {
++			spin_unlock_irqrestore(&cdev->lock, flags);
+ 			status = usb_gadget_activate(cdev->gadget);
++			spin_lock_irqsave(&cdev->lock, flags);
++		}
+ 	}
+ 
+ 	spin_unlock_irqrestore(&cdev->lock, flags);
+-- 
+2.7.4
+
