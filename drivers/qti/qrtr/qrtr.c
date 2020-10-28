@@ -225,7 +225,7 @@ static int qrtr_local_enqueue(struct qrtr_node *node, struct sk_buff *skb,
 static int qrtr_bcast_enqueue(struct qrtr_node *node, struct sk_buff *skb,
 			      int type, struct sockaddr_qrtr *from,
 			      struct sockaddr_qrtr *to, unsigned int flags);
-static void qrtr_handle_del_proc(struct sk_buff *skb);
+static void qrtr_handle_del_proc(struct qrtr_node *node, struct sk_buff *skb);
 static void qrtr_cleanup_flow_control(struct qrtr_node *node, struct sk_buff *skb);
 
 static void qrtr_log_tx_msg(struct qrtr_node *node, struct qrtr_hdr_v1 *hdr,
@@ -313,6 +313,10 @@ static void qrtr_log_rx_msg(struct qrtr_node *node, struct sk_buff *skb)
 			QRTR_INFO(node->ilc,
 				  "RX CTRL: cmd:0x%x node[0x%x]\n",
 				  cb->type, cb->src_node);
+		else if (cb->type == QRTR_TYPE_DEL_PROC)
+			QRTR_INFO(node->ilc,
+				  "RX CTRL: cmd:0x%x node[0x%x]\n",
+				  cb->type, le32_to_cpu(pkt.proc.node));
 	}
 }
 
@@ -1044,7 +1048,7 @@ static void qrtr_node_rx_work(struct kthread_work *work)
 			   cb->type == QRTR_TYPE_DATA) {
 			qrtr_fwd_pkt(skb, cb);
 		} else if (cb->type == QRTR_TYPE_DEL_PROC) {
-			qrtr_handle_del_proc(skb);
+			qrtr_handle_del_proc(node, skb);
 		} else {
 			ipc = qrtr_port_lookup(cb->dst_port);
 			if (!ipc) {
@@ -1101,14 +1105,37 @@ static void qrtr_cleanup_flow_control(struct qrtr_node *node, struct sk_buff *sk
 	mutex_unlock(&node->qrtr_tx_lock);
 }
 
-static void qrtr_handle_del_proc(struct sk_buff *skb)
+static void qrtr_handle_del_proc(struct qrtr_node *node, struct sk_buff *skb)
 {
 	struct sockaddr_qrtr src = {AF_QIPCRTR, 0, QRTR_PORT_CTRL};
 	struct sockaddr_qrtr dst = {AF_QIPCRTR, qrtr_local_nid, QRTR_PORT_CTRL};
 	struct qrtr_ctrl_pkt pkt = {0,};
+	struct qrtr_tx_flow_waiter *waiter;
+	struct qrtr_tx_flow_waiter *temp;
+	struct radix_tree_iter iter;
+	struct qrtr_tx_flow *flow;
+	void __rcu **slot;
+	u32 node_id;
 
 	skb_copy_bits(skb, 0, &pkt, sizeof(pkt));
 	src.sq_node = le32_to_cpu(pkt.proc.node);
+	/* Free tx flow counters */
+	mutex_lock(&node->qrtr_tx_lock);
+	radix_tree_for_each_slot(slot, &node->qrtr_tx_flow, &iter, 0) {
+		flow = *slot;
+		/* extract node id from the index key */
+		node_id = (u32)(iter.index >> 32);
+		if (node_id != src.sq_node)
+			continue;
+		list_for_each_entry_safe(waiter, temp, &flow->waiters, node) {
+			list_del(&waiter->node);
+			sock_put(waiter->sk);
+			kfree(waiter);
+		}
+		kfree(flow);
+		radix_tree_delete(&node->qrtr_tx_flow, iter.index);
+	}
+	mutex_unlock(&node->qrtr_tx_lock);
 
 	memset(&pkt, 0, sizeof(pkt));
 	pkt.cmd = cpu_to_le32(QRTR_TYPE_BYE);
