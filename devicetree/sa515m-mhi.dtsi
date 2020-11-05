@@ -14,7 +14,6 @@
 	aliases {
 		mhi2 = &mhi_2;
 		mhi_netdev5 = &mhi_netdev_5;
-		mhi_netdev6 = &mhi_netdev_6;
 		mhi_netdev7 = &mhi_netdev_7;
 	};
 
@@ -178,30 +177,6 @@
 				mhi,doorbell-mode = <3>;
 				mhi,ee = <0x4>;
 			};
-
-			mhi_chan@105 {
-				reg = <105>;
-				label = "IP_HW1";
-				mhi,num-elements = <512>;
-				mhi,event-ring = <8>;
-				mhi,chan-dir = <1>;
-				mhi,data-type = <1>;
-				mhi,doorbell-mode = <2>;
-				mhi,ee = <0x4>;
-				mhi,bei-disable;
-			};
-
-			mhi_chan@106 {
-				reg = <106>;
-				label = "IP_HW1";
-				mhi,num-elements = <512>;
-				mhi,event-ring = <9>;
-				mhi,chan-dir = <2>;
-				mhi,data-type = <4>;
-				mhi,doorbell-mode = <2>;
-				mhi,ee = <0x4>;
-				mhi,bei-disable;
-			};
 		};
 
 		mhi_events {
@@ -277,27 +252,6 @@
 				mhi,hw-ev;
 				mhi,client-manage;
 			};
-
-			mhi_event@8 {
-				mhi,num-elements = <1024>;
-				mhi,intmod = <0>;
-				mhi,msi = <7>;
-				mhi,chan = <105>;
-				mhi,priority = <1>;
-				mhi,brstmode = <2>;
-				mhi,hw-ev;
-			};
-
-			mhi_event@9 {
-				mhi,num-elements = <1024>;
-				mhi,intmod = <0>;
-				mhi,msi = <8>;
-				mhi,chan = <106>;
-				mhi,priority = <1>;
-				mhi,brstmode = <2>;
-				mhi,hw-ev;
-				mhi,client-manage;
-			};
 		};
 
 		mhi_devices {
@@ -307,15 +261,6 @@
 			mhi_netdev_5: mhi_rmnet@0 {
 				reg = <0x0>;
 				mhi,chan = "IP_HW0";
-				mhi,interface-name = "rmnet_mhi";
-				mhi,mru = <0x4000>;
-				mhi,disable-chain-skb;
-			};
-
-
-			mhi_netdev_6: mhi_rmnet@1 {
-				reg = <0x1>;
-				mhi,chan = "IP_HW1";
 				mhi,interface-name = "rmnet_mhi";
 				mhi,mru = <0x4000>;
 				mhi,disable-chain-skb;
