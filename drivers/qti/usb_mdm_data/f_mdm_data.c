@@ -1430,12 +1430,13 @@ mdm_data_set_inst_name(struct usb_function_instance *fi, const char *name)
 		return -EINVAL;
 	}
 
-	opts->ctxt = mdm_data_ports[id];
-	ret = mdm_data_port_init(opts->ctxt, name);
+	ret = mdm_data_port_init(mdm_data_ports[id], name);
 	if (ret) {
 		pr_err("%s: Unable to initialize inst %s\n", __func__, name);
 		return ret;
 	}
+
+	opts->ctxt = mdm_data_ports[id];
 
 	return 0;
 }
@@ -1445,8 +1446,9 @@ static void mdm_data_free_inst(struct usb_function_instance *f)
 	struct mdm_data_opts *opts;
 
 	opts = container_of(f, struct mdm_data_opts, func_inst);
-	mdm_data_port_deinit(opts->ctxt);
-	kfree(opts->ctxt);
+	if (opts->ctxt)
+		mdm_data_port_deinit(opts->ctxt);
+
 	mutex_destroy(&opts->lock);
 	kfree(opts);
 }
