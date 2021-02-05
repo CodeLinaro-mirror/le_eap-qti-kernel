@@ -1,4 +1,4 @@
-/* Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018-2019,2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -600,15 +600,15 @@ static int mhi_netdev_enable_iface(struct mhi_netdev *mhi_netdev)
 					mhi_netdev_ether_setup :
 					mhi_netdev_rawip_setup);
 
+	if (!mhi_netdev->ndev) {
+		rtnl_unlock();
+		return -ENOMEM;
+	}
+
 	if (mhi_netdev->ethernet_interface) {
 		eth_random_addr(mhi_netdev->ndev->dev_addr);
 		if (!is_valid_ether_addr(mhi_netdev->ndev->dev_addr))
 			return -EADDRNOTAVAIL;
-	}
-
-	if (!mhi_netdev->ndev) {
-		rtnl_unlock();
-		return -ENOMEM;
 	}
 
 	if (mhi_dev->mtu > MHI_NET_MAX_MTU)
