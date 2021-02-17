@@ -33,4 +33,19 @@ config QTI_QRTR_ETHERNET
 	  is the transport used for external auto connections for IPC router.
 	  This has a dependency on ethernet adaption layer.
 
+config QRTR_SMD
+	tristate "Dummy SMD IPC Router channels"
+	select QTI_QRTR_SMD
+	---help---
+	  This will help to pick SMD driver from eap kernel if SMD driver is
+	  enabled from msm kernel. SMD driver is required to support
+	  communication between apps and other sub systems within the soc.
+
+config QTI_QRTR_SMD
+        tristate "SMD IPC Router channels"
+        depends on RPMSG || (COMPILE_TEST && RPMSG=n)
+        ---help---
+          Say Y here to support SMD based ipcrouter channels.  SMD is the
+          most common transport for IPC Router.
+
 endif # QRTR_QTI
