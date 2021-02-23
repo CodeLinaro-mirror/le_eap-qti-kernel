@@ -1,4 +1,4 @@
-/* Copyright (c) 2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 and
@@ -38,8 +38,8 @@ do { \
 			"[%s]: "__msg, __func__, ##__VA_ARGS__); \
 } while (0)
 
-void	*ipc_log;
-void	*ctrl;
+void	*ipc_log = NULL;
+void	*ctrl = NULL;
 
 enum pcie_ssr_power_option {
 	PCIE_POWER_OFF,
