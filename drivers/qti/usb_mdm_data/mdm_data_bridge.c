@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, 2019-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, 2019-2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -870,12 +870,6 @@ bridge_probe(struct usb_interface *iface, const struct usb_device_id *id)
 		return -EINVAL;
 	}
 
-	if (devid == USB_BRIDGE_DIAG &&
-			udev->actconfig->desc.bNumInterfaces == 1) {
-		pr_err("Invalid configuration: Only one interface\n");
-		return -EINVAL;
-	}
-
 	num_eps = iface->cur_altsetting->desc.bNumEndpoints;
 	for (i = 0; i < num_eps; i++) {
 		endpoint = iface->cur_altsetting->endpoint + i;
@@ -990,6 +984,10 @@ static void bridge_disconnect(struct usb_interface *intf)
 static const struct usb_device_id bridge_ids[] = {
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9008, 0),
 	.driver_info = (kernel_ulong_t)("edl"), },
+	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x900E, 0x10),
+	.driver_info = (kernel_ulong_t)("dump"), },
+	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x90DB, 0x10),
+	.driver_info = (kernel_ulong_t)("dump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x90DB, 1),
 	.driver_info = (kernel_ulong_t)("serial"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x90DB, 2),
@@ -998,34 +996,54 @@ static const struct usb_device_id bridge_ids[] = {
 	.driver_info = (kernel_ulong_t)("dpl"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x90DB, 4),
 	.driver_info = (kernel_ulong_t)("qdss"), },
+	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x9102, 0x10),
+	.driver_info = (kernel_ulong_t)("dump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9102, 6),
 	.driver_info = (kernel_ulong_t)("qdss"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9102, 7),
 	.driver_info = (kernel_ulong_t)("dpl"), },
+	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x9103, 0x10),
+	.driver_info = (kernel_ulong_t)("dump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9103, 6),
 	.driver_info = (kernel_ulong_t)("dpl"), },
+	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x9104, 0x10),
+	.driver_info = (kernel_ulong_t)("dump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9104, 1),
 	.driver_info = (kernel_ulong_t)("qdss"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9104, 2),
 	.driver_info = (kernel_ulong_t)("dpl"), },
+	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x9105, 0x10),
+	.driver_info = (kernel_ulong_t)("dump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9105, 1),
 	.driver_info = (kernel_ulong_t)("dpl"), },
+	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x9106, 0x10),
+	.driver_info = (kernel_ulong_t)("dump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9106, 5),
 	.driver_info = (kernel_ulong_t)("qdss"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9106, 6),
 	.driver_info = (kernel_ulong_t)("dpl"), },
+	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x9107, 0x10),
+	.driver_info = (kernel_ulong_t)("dump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9107, 5),
 	.driver_info = (kernel_ulong_t)("dpl"), },
+	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x910A, 0x10),
+	.driver_info = (kernel_ulong_t)("dump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x910A, 2),
 	.driver_info = (kernel_ulong_t)("dpl"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x910A, 3),
 	.driver_info = (kernel_ulong_t)("qdss"), },
+	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x910B, 0x10),
+	.driver_info = (kernel_ulong_t)("dump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x910B, 2),
 	.driver_info = (kernel_ulong_t)("dpl"), },
+	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x910C, 0x10),
+	.driver_info = (kernel_ulong_t)("dump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x910C, 1),
 	.driver_info = (kernel_ulong_t)("dpl"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x910C, 2),
 	.driver_info = (kernel_ulong_t)("qdss"), },
+	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x910D, 0x10),
+	.driver_info = (kernel_ulong_t)("dump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x910D, 1),
 	.driver_info = (kernel_ulong_t)("dpl"), },
 
