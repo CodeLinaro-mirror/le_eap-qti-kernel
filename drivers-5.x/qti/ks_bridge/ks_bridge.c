@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014, 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, 2017-2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -87,6 +87,9 @@ static rwlock_t dbg_lock = __RW_LOCK_UNLOCKED(lck);
 /* by default debugging is enabled */
 static unsigned int enable_dbg = 1;
 module_param(enable_dbg, uint, 0644);
+
+static bool prevent_dump_probe;
+module_param(prevent_dump_probe, bool, 0644);
 
 static bool prevent_edl_probe;
 module_param(prevent_edl_probe, bool, 0644);
@@ -635,6 +638,11 @@ ksb_usb_probe(struct usb_interface *ifc, const struct usb_device_id *id)
 	int				devid;
 
 	pr_debug("%s: id: %lu\n", __func__, id->driver_info);
+
+	if (prevent_dump_probe && (le16_to_cpu(id->idProduct) != 0x9008)) {
+		pr_err("%s: Preventing DUMP device enumeration\n", __func__);
+		return -EINVAL;
+	}
 
 	if (prevent_edl_probe && (le16_to_cpu(id->idProduct) == 0x9008)) {
 		pr_err("%s: Preventing EDL device enumeration\n", __func__);
