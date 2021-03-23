@@ -112,6 +112,9 @@ struct bridge {
 
 	/* data/ctrl bridge callbacks */
 	struct bridge_ops ops;
+
+	unsigned int host_rx_urb_size;
+	unsigned int device_rx_trb_size;
 };
 
 /**

@@ -65,6 +65,7 @@ struct data_bridge {
 
 	unsigned int			bulk_in;
 	unsigned int			bulk_out;
+	unsigned int 			out_mps;
 	int				err;
 
 	/* keep track of in-flight URBs */
@@ -341,6 +342,7 @@ int data_bridge_open(struct bridge *brdg)
 	}
 
 	brdg->ch_id = ch_id;
+	brdg->host_rx_urb_size = rx_buffer_size;
 
 	dev = __mdm_dev[ch_id];
 
@@ -549,6 +551,10 @@ int data_bridge_write(unsigned int id, struct sk_buff *skb)
 
 	if (atomic_read(&dev->pending_txurbs) % tx_urb_mult)
 		txurb->transfer_flags |= URB_NO_INTERRUPT;
+
+	if ((size < brdg->device_rx_trb_size) &&
+			!(size % le16_to_cpu(dev->out_mps)))
+		txurb->transfer_flags |= URB_ZERO_PACKET;
 
 	result = usb_submit_urb(txurb, GFP_KERNEL);
 	if (result < 0) {
@@ -899,9 +905,11 @@ bridge_probe(struct usb_interface *iface, const struct usb_device_id *id)
 	dev->name = bname;
 	dev->bulk_in = usb_rcvbulkpipe(dev->udev,
 				bulk_in->desc.bEndpointAddress);
-	if (bulk_out)
+	if (bulk_out) {
 		dev->bulk_out = usb_sndbulkpipe(dev->udev,
 					bulk_out->desc.bEndpointAddress);
+		dev->out_mps = le16_to_cpu(bulk_out->desc.wMaxPacketSize);
+	}
 
 	init_usb_anchor(&dev->tx_active);
 	init_usb_anchor(&dev->rx_active);
