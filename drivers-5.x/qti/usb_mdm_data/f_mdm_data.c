@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, 2019-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, 2019-2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -724,6 +724,9 @@ static void mdm_data_write_tohost(struct work_struct *w)
 		req->context = skb;
 		req->buf = skb->data;
 		req->length = skb->len;
+		req->zero = ((skb->len < port->brdg.host_rx_urb_size) &&
+			!(skb->len % le16_to_cpu(ep->desc->wMaxPacketSize)))
+					? true : false;
 
 		port->n_tx_req_queued++;
 		if (port->n_tx_req_queued == mdm_data_tx_intr_thld) {
@@ -1353,6 +1356,7 @@ static void mdm_data_connect_w(struct work_struct *w)
 
 	pr_debug("%s: port:%pK\n", __func__, port);
 
+	port->brdg.device_rx_trb_size = mdm_data_rx_req_size;
 	ret = data_bridge_open(&port->brdg);
 	if (ret) {
 		pr_err("%s: unable open bridge ch:%d err:%d\n",
