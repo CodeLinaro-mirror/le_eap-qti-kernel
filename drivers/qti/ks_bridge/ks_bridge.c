@@ -88,8 +88,8 @@ static rwlock_t dbg_lock = __RW_LOCK_UNLOCKED(lck);
 static unsigned int enable_dbg = 1;
 module_param(enable_dbg, uint, 0644);
 
-static bool prevent_dump_probe;
-module_param(prevent_dump_probe, bool, 0644);
+static bool prevent_ramdump_probe;
+module_param(prevent_ramdump_probe, bool, 0644);
 
 static bool prevent_edl_probe;
 module_param(prevent_edl_probe, bool, 0644);
@@ -639,11 +639,13 @@ ksb_usb_probe(struct usb_interface *ifc, const struct usb_device_id *id)
 
 	pr_debug("%s: id: %lu\n", __func__, id->driver_info);
 
-	if (prevent_dump_probe && (le16_to_cpu(id->idProduct) != 0x9008)) {
-		pr_err("%s: Preventing DUMP device enumeration\n", __func__);
+	/* Below check is used to prevent crashed NAD to bind to ks_bridge */
+	if (prevent_ramdump_probe && (le16_to_cpu(id->idProduct) != 0x9008)) {
+		pr_err("%s: Preventing crashed device enumeration\n", __func__);
 		return -EINVAL;
 	}
 
+	/* Below check is used to prevent NAD in 9008 to bind to ks_bridge */
 	if (prevent_edl_probe && (le16_to_cpu(id->idProduct) == 0x9008)) {
 		pr_err("%s: Preventing EDL device enumeration\n", __func__);
 		return -EINVAL;
