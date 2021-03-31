@@ -65,7 +65,7 @@ struct data_bridge {
 
 	unsigned int			bulk_in;
 	unsigned int			bulk_out;
-	unsigned int 			out_mps;
+	unsigned int			out_MaxPacketSize;
 	int				err;
 
 	/* keep track of in-flight URBs */
@@ -552,8 +552,12 @@ int data_bridge_write(unsigned int id, struct sk_buff *skb)
 	if (atomic_read(&dev->pending_txurbs) % tx_urb_mult)
 		txurb->transfer_flags |= URB_NO_INTERRUPT;
 
+	/*
+	 * Append a ZLP if the packet size is a multiple of MPS of
+	 * the host side driver and less than the TRB size.
+	 */
 	if ((size < brdg->device_rx_trb_size) &&
-			!(size % le16_to_cpu(dev->out_mps)))
+			!(size % dev->out_MaxPacketSize))
 		txurb->transfer_flags |= URB_ZERO_PACKET;
 
 	result = usb_submit_urb(txurb, GFP_KERNEL);
@@ -908,7 +912,8 @@ bridge_probe(struct usb_interface *iface, const struct usb_device_id *id)
 	if (bulk_out) {
 		dev->bulk_out = usb_sndbulkpipe(dev->udev,
 					bulk_out->desc.bEndpointAddress);
-		dev->out_mps = le16_to_cpu(bulk_out->desc.wMaxPacketSize);
+		dev->out_MaxPacketSize =
+				le16_to_cpu(bulk_out->desc.wMaxPacketSize);
 	}
 
 	init_usb_anchor(&dev->tx_active);
@@ -993,9 +998,9 @@ static const struct usb_device_id bridge_ids[] = {
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9008, 0),
 	.driver_info = (kernel_ulong_t)("edl"), },
 	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x900E, 0x10),
-	.driver_info = (kernel_ulong_t)("dump"), },
+	.driver_info = (kernel_ulong_t)("ramdump"), },
 	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x90DB, 0x10),
-	.driver_info = (kernel_ulong_t)("dump"), },
+	.driver_info = (kernel_ulong_t)("ramdump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x90DB, 1),
 	.driver_info = (kernel_ulong_t)("serial"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x90DB, 2),
@@ -1005,53 +1010,53 @@ static const struct usb_device_id bridge_ids[] = {
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x90DB, 4),
 	.driver_info = (kernel_ulong_t)("qdss"), },
 	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x9102, 0x10),
-	.driver_info = (kernel_ulong_t)("dump"), },
+	.driver_info = (kernel_ulong_t)("ramdump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9102, 6),
 	.driver_info = (kernel_ulong_t)("qdss"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9102, 7),
 	.driver_info = (kernel_ulong_t)("dpl"), },
 	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x9103, 0x10),
-	.driver_info = (kernel_ulong_t)("dump"), },
+	.driver_info = (kernel_ulong_t)("ramdump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9103, 6),
 	.driver_info = (kernel_ulong_t)("dpl"), },
 	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x9104, 0x10),
-	.driver_info = (kernel_ulong_t)("dump"), },
+	.driver_info = (kernel_ulong_t)("ramdump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9104, 1),
 	.driver_info = (kernel_ulong_t)("qdss"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9104, 2),
 	.driver_info = (kernel_ulong_t)("dpl"), },
 	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x9105, 0x10),
-	.driver_info = (kernel_ulong_t)("dump"), },
+	.driver_info = (kernel_ulong_t)("ramdump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9105, 1),
 	.driver_info = (kernel_ulong_t)("dpl"), },
 	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x9106, 0x10),
-	.driver_info = (kernel_ulong_t)("dump"), },
+	.driver_info = (kernel_ulong_t)("ramdump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9106, 5),
 	.driver_info = (kernel_ulong_t)("qdss"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9106, 6),
 	.driver_info = (kernel_ulong_t)("dpl"), },
 	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x9107, 0x10),
-	.driver_info = (kernel_ulong_t)("dump"), },
+	.driver_info = (kernel_ulong_t)("ramdump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9107, 5),
 	.driver_info = (kernel_ulong_t)("dpl"), },
 	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x910A, 0x10),
-	.driver_info = (kernel_ulong_t)("dump"), },
+	.driver_info = (kernel_ulong_t)("ramdump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x910A, 2),
 	.driver_info = (kernel_ulong_t)("dpl"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x910A, 3),
 	.driver_info = (kernel_ulong_t)("qdss"), },
 	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x910B, 0x10),
-	.driver_info = (kernel_ulong_t)("dump"), },
+	.driver_info = (kernel_ulong_t)("ramdump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x910B, 2),
 	.driver_info = (kernel_ulong_t)("dpl"), },
 	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x910C, 0x10),
-	.driver_info = (kernel_ulong_t)("dump"), },
+	.driver_info = (kernel_ulong_t)("ramdump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x910C, 1),
 	.driver_info = (kernel_ulong_t)("dpl"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x910C, 2),
 	.driver_info = (kernel_ulong_t)("qdss"), },
 	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x910D, 0x10),
-	.driver_info = (kernel_ulong_t)("dump"), },
+	.driver_info = (kernel_ulong_t)("ramdump"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x910D, 1),
 	.driver_info = (kernel_ulong_t)("dpl"), },
 

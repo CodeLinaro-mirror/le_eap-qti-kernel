@@ -35,7 +35,7 @@ enum bridge_id {
 	USB_BRIDGE_DPL,
 	USB_BRIDGE_EDL,
 	USB_BRIDGE_DIAG,
-	USB_BRIDGE_DUMP,
+	USB_BRIDGE_RAMDUMP,
 	USB_BRIDGE_RMNET,
 	USB_BRIDGE_SERIAL,
 	MAX_BRIDGE_DEVICES,
@@ -54,8 +54,8 @@ static int bridge_name_to_id(const char *name)
 		return USB_BRIDGE_EDL;
 	if (!strncasecmp(name, "diag", MAX_INST_NAME_LEN))
 		return USB_BRIDGE_DIAG;
-	if (!strncasecmp(name, "dump", MAX_INST_NAME_LEN))
-		return USB_BRIDGE_DUMP;
+	if (!strncasecmp(name, "ramdump", MAX_INST_NAME_LEN))
+		return USB_BRIDGE_RAMDUMP;
 	if (!strncasecmp(name, "rmnet", MAX_INST_NAME_LEN))
 		return USB_BRIDGE_RMNET;
 	if (!strncasecmp(name, "serial", MAX_INST_NAME_LEN))
@@ -73,7 +73,7 @@ static int bridge_id_to_protocol(enum bridge_id id)
 	case USB_BRIDGE_DPL:
 		return 0x80;
 	case USB_BRIDGE_EDL:
-	case USB_BRIDGE_DUMP:
+	case USB_BRIDGE_RAMDUMP:
 		return 0x10;
 	case USB_BRIDGE_DIAG:
 		return 0x30;
@@ -113,6 +113,7 @@ struct bridge {
 	/* data/ctrl bridge callbacks */
 	struct bridge_ops ops;
 
+	/* Used for appending ZLP in both directions */
 	unsigned int host_rx_urb_size;
 	unsigned int device_rx_trb_size;
 };

@@ -724,9 +724,12 @@ static void mdm_data_write_tohost(struct work_struct *w)
 		req->context = skb;
 		req->buf = skb->data;
 		req->length = skb->len;
+		/*
+		 * Append a ZLP if the packet size is a multiple of MPS of
+		 * gadget side driver and less than the URB size.
+		 */
 		req->zero = ((skb->len < port->brdg.host_rx_urb_size) &&
-			!(skb->len % le16_to_cpu(ep->desc->wMaxPacketSize)))
-					? true : false;
+			!(skb->len % le16_to_cpu(ep->desc->wMaxPacketSize)));
 
 		port->n_tx_req_queued++;
 		if (port->n_tx_req_queued == mdm_data_tx_intr_thld) {
