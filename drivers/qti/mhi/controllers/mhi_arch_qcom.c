@@ -1,4 +1,4 @@
-/* Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -239,6 +239,12 @@ int mhi_arch_pcie_ssr_ops_power_on(void *priv)
 	return 0;
 }
 EXPORT_SYMBOL(mhi_arch_pcie_ssr_ops_power_on);
+
+void mhi_arch_mission_mode_enter(struct mhi_controller *mhi_cntrl)
+{
+	struct mhi_dev *mhi_dev = mhi_controller_get_devdata(mhi_cntrl);
+	pm_runtime_allow(&mhi_dev->pci_dev->dev);
+}
 
 int mhi_arch_pcie_init(struct mhi_controller *mhi_cntrl)
 {

@@ -1,4 +1,4 @@
-/* Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -116,10 +116,15 @@ int mhi_arch_link_resume(struct mhi_controller *mhi_cntrl)
 {
 	return 0;
 }
+
+static inline void mhi_arch_mission_mode_enter(struct mhi_controller *mhi_cntrl)
+{
+}
 #else
 int mhi_arch_pcie_init(struct mhi_controller *mhi_cntrl);
 int mhi_arch_link_suspend(struct mhi_controller *mhi_cntrl);
 int mhi_arch_link_resume(struct mhi_controller *mhi_cntrl);
+void mhi_arch_mission_mode_enter(struct mhi_controller *mhi_cntrl);
 #endif
 
 static inline void mhi_arch_pcie_deinit(struct mhi_controller *mhi_cntrl)
