@@ -38,6 +38,7 @@ enum bridge_id {
 	USB_BRIDGE_RAMDUMP,
 	USB_BRIDGE_RMNET,
 	USB_BRIDGE_SERIAL,
+	USB_BRIDGE_NMEA,
 	MAX_BRIDGE_DEVICES,
 };
 
@@ -60,6 +61,8 @@ static int bridge_name_to_id(const char *name)
 		return USB_BRIDGE_RMNET;
 	if (!strncasecmp(name, "serial", MAX_INST_NAME_LEN))
 		return USB_BRIDGE_SERIAL;
+	if (!strncasecmp(name, "nmea", MAX_INST_NAME_LEN))
+		return USB_BRIDGE_NMEA;
 
 fail:
 	return -EINVAL;
@@ -81,6 +84,8 @@ static int bridge_id_to_protocol(enum bridge_id id)
 		return 0x50;
 	case USB_BRIDGE_SERIAL:
 		return 0x40;
+	case USB_BRIDGE_NMEA:
+		return 0x60;
 	default:
 		return -EINVAL;
 	}
