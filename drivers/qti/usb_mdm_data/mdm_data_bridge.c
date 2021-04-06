@@ -995,6 +995,12 @@ static void bridge_disconnect(struct usb_interface *intf)
 
 /*driver info stores data bridge name used to match bridge xport name*/
 static const struct usb_device_id bridge_ids[] = {
+	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9001, 1),
+	.driver_info = (kernel_ulong_t)("nmea"), },
+	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9001, 2),
+	.driver_info = (kernel_ulong_t)("serial"), },
+	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9001, 3),
+	.driver_info = (kernel_ulong_t)("rmnet"), },
 	{ USB_DEVICE_INTERFACE_NUMBER(0x05c6, 0x9008, 0),
 	.driver_info = (kernel_ulong_t)("edl"), },
 	{ USB_DEVICE_INTERFACE_PROTOCOL(0x05c6, 0x900E, 0x10),

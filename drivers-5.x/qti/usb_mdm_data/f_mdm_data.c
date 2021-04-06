@@ -890,7 +890,7 @@ mdm_data_epout_complete(struct usb_ep *ep, struct usb_request *req)
 	int			status = req->status;
 	bool			queue = false;
 
-	pr_debug("%s: skb_len: %d, status: %d", __func__, skb->len, status);
+	pr_debug("%s: skb_len: %d, status: %d", __func__, req->actual, status);
 	switch (status) {
 	case 0:
 		skb_put(skb, req->actual);
@@ -1141,9 +1141,8 @@ mdm_ctrl_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 	u16				w_length = le16_to_cpu(ctrl->wLength);
 	int				ret = -EOPNOTSUPP;
 
-	pr_debug("%s: mdm_ctrl_port: %pK\n", __func__, port);
-
 	port = mdm_ctrl_ports[data->id];
+	pr_debug("%s: mdm_ctrl_port: %pK\n", __func__, port);
 
 	switch ((ctrl->bRequestType << 8) | ctrl->bRequest) {
 	case ((USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE) << 8)
