@@ -872,6 +872,13 @@ static int mhi_netdev_probe(struct mhi_device *mhi_dev,
 	if (!mhi_netdev)
 		return -ENOMEM;
 
+	/* move mhi channels to start state */
+	ret = mhi_prepare_for_transfer(mhi_dev);
+	if (ret) {
+		MSG_ERR("Failed to start channels ret %d\n", ret);
+		return ret;
+	}
+
 	mhi_netdev->mhi_dev = mhi_dev;
 	mhi_device_set_devdata(mhi_dev, mhi_netdev);
 
@@ -930,13 +937,6 @@ static int mhi_netdev_probe(struct mhi_device *mhi_dev,
 		mhi_netdev->ipc_log_lvl = IPC_LOG_LVL;
 
 		mhi_netdev_create_debugfs(mhi_netdev);
-	}
-
-	/* move mhi channels to start state */
-	ret = mhi_prepare_for_transfer(mhi_dev);
-	if (ret) {
-		MSG_ERR("Failed to start channels ret %d\n", ret);
-		goto error_start;
 	}
 
 	/* setup pool size ~2x ring length*/
