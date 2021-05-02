@@ -69,8 +69,6 @@ static inline void *ipc_log_context_create(int max_num_pages,
 #define QRTR_STATE_MULTI	-2
 #define QRTR_STATE_INIT	-1
 
-#define AID_VENDOR_QRTR	KGIDT_INIT(2906)
-
 /**
  * struct qrtr_hdr_v1 - (I|R)PCrouter packet header version 1
  * @version: protocol version
