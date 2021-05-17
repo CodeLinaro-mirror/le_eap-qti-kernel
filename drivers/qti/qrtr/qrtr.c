@@ -148,6 +148,9 @@ static inline struct qrtr_sock *qrtr_sk(struct sock *sk)
 }
 
 static unsigned int qrtr_local_nid = 1;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0))
+static unsigned int qrtr_wakeup_ms = CONFIG_QRTR_WAKEUP_MS;
+#endif
 
 /* for node ids */
 static RADIX_TREE(qrtr_nodes, GFP_KERNEL);
@@ -862,7 +865,11 @@ int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len)
 	    cb->type != QRTR_TYPE_RESUME_TX)
 		goto err;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0))
 	__pm_wakeup_event(node->ws, 0);
+#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0) */
+	pm_wakeup_ws_event(node->ws, qrtr_wakeup_ms, true);
+#endif
 
 	skb->data_len = size;
 	skb->len = size;

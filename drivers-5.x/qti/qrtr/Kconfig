@@ -13,6 +13,17 @@ config QTI_QRTR
 
 if QTI_QRTR
 
+config QRTR_WAKEUP_MS
+	int "QRTR Wakeup timeout"
+	default 0
+	help
+	  This option is used to configure the wakesource timeout that QRTR
+	  should take when a packet is received. The qrtr driver can guarantee
+	  that the packet gets queued to the socket but cannot guarantee the
+	  client process will get time to run if auto sleep is enabled. This
+	  config will help mitigate missed packets on systems where auto sleep
+	  is aggressive.
+
 config QTI_QRTR_MHI
 	tristate "MHI IPC Router channels"
 	depends on QTI_MHI_BUS || (COMPILE_TEST && QTI_MHI_BUS=n)
