@@ -69,83 +69,23 @@ static void mhi_arch_pci_link_state_cb(struct msm_pcie_notify *notify)
 	}
 }
 
-int mhi_arch_link_off(struct mhi_controller *mhi_cntrl, bool graceful)
+static void mhi_arch_link_off(struct mhi_controller *mhi_cntrl)
 {
-       struct mhi_dev *mhi_dev = mhi_controller_get_devdata(mhi_cntrl);
-       struct arch_info *arch_info = mhi_dev->arch_info;
-       struct pci_dev *pci_dev = mhi_dev->pci_dev;
-       int ret;
+		struct mhi_dev *mhi_dev = mhi_controller_get_devdata(mhi_cntrl);
+		struct pci_dev *pci_dev = mhi_dev->pci_dev;
+		int ret;
 
-       MHI_LOG("Entered\n");
+		MHI_LOG("Entered\n");
 
-       if (graceful) {
-               ret = pci_save_state(mhi_dev->pci_dev);
-               if (ret) {
-                       MHI_ERR("Failed with pci_save_state, ret:%d\n", ret);
-                       return ret;
-               }
+		ret = pci_set_power_state(pci_dev, PCI_D3hot);
+		if (ret)
+			MHI_ERR("Failed to set D3hot, ret:%d\n", ret);
 
-               arch_info->pcie_state = pci_store_saved_state(pci_dev);
-               pci_disable_device(pci_dev);
-               ret = pci_set_power_state(pci_dev, PCI_D3hot);
-               if (ret) {
-                       MHI_ERR("Failed to set D3hot, ret:%d\n", ret);
-                       return ret;
-               }
-       }
+		/* release the resources */
+		msm_pcie_pm_control(MSM_PCIE_SUSPEND, mhi_cntrl->bus, pci_dev, NULL, 0);
+		mhi_arch_set_bus_request(mhi_cntrl, 0);
 
-       /* release the resources */
-       msm_pcie_pm_control(MSM_PCIE_SUSPEND, mhi_cntrl->bus, pci_dev, NULL, 0);
-       mhi_arch_set_bus_request(mhi_cntrl, 0);
-
-       MHI_LOG("Exited\n");
-
-       return 0;
-}
-
-int mhi_arch_link_on(struct mhi_controller *mhi_cntrl)
-{
-       struct mhi_dev *mhi_dev = mhi_controller_get_devdata(mhi_cntrl);
-       struct arch_info *arch_info = mhi_dev->arch_info;
-       struct pci_dev *pci_dev = mhi_dev->pci_dev;
-       int ret;
-
-       MHI_LOG("Entered\n");
-
-       /* request resources and establish link trainning */
-       ret = mhi_arch_set_bus_request(mhi_cntrl, 1);
-       if (ret)
-               MHI_LOG("Could not set bus frequency, ret:%d\n", ret);
-
-       ret = msm_pcie_pm_control(MSM_PCIE_RESUME, mhi_cntrl->bus, pci_dev,
-                                 NULL, 0);
-       if (ret) {
-               MHI_ERR("Link training failed, ret:%d\n", ret);
-               return ret;
-       }
-
-       ret = pci_set_power_state(pci_dev, PCI_D0);
-       if (ret) {
-               MHI_ERR("Failed to set PCI_D0 state, ret:%d\n", ret);
-               return ret;
-       }
-
-       ret = pci_enable_device(pci_dev);
-       if (ret) {
-               MHI_ERR("Failed to enable device, ret:%d\n", ret);
-               return ret;
-       }
-
-       ret = pci_load_and_free_saved_state(pci_dev, &arch_info->pcie_state);
-       if (ret)
-               MHI_LOG("Failed to load saved cfg state\n");
-
-       pci_restore_state(pci_dev);
-       pci_set_master(pci_dev);
-
-       MHI_LOG("Exited\n");
-
-       return 0;
+		MHI_LOG("Exited\n");
 }
 
 void mhi_arch_pcie_ssr_ops_power_off(void *priv)
@@ -185,7 +125,7 @@ void mhi_arch_pcie_ssr_ops_power_off(void *priv)
 		/* turn the link off */
 		mhi_deinit_pci_dev(mhi_cntrl);
 
-		mhi_arch_link_off(mhi_cntrl, true);
+		mhi_arch_link_off(mhi_cntrl);
 
 		mhi_arch_iommu_deinit(mhi_cntrl);
 
