@@ -1048,7 +1048,7 @@ static int diag_send_raw_data_remote(int proc, void *buf, int len,
 	int bridge_index = proc - 1;
 	uint8_t hdlc_disabled = 0;
 
-	if (!buf)
+	if (!buf || proc <= 0 || proc >= NUM_DIAG_MD_DEV)
 		return -EINVAL;
 
 	if (len <= 0) {
@@ -3375,7 +3375,7 @@ static int diag_user_process_raw_data(const char __user *buf, int len)
 	/* Check for proc_type */
 	if (len >= sizeof(int))
 		remote_proc = diag_get_remote(*(int *)user_space_data);
-	if (remote_proc) {
+	if (remote_proc && (remote_proc < NUM_DIAG_MD_DEV)) {
 		token_offset = sizeof(int);
 		if (len <= MIN_SIZ_ALLOW) {
 			pr_err("diag: In %s, possible integer underflow, payload size: %d\n",
