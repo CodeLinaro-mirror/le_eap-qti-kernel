@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2019, 2021 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -170,7 +170,7 @@ static void mhi_buf_tbl_clear(struct diag_mhi_info *mhi_info)
 	struct diag_mhi_buf_tbl_t *item = NULL;
 	struct diag_mhi_buf_tbl_t *tp = NULL, *tp_temp = NULL;
 	struct diag_mhi_ch_t *ch = NULL;
-	unsigned char *buf;
+	unsigned char *buf = NULL;
 
 	if (!mhi_info || !mhi_info->enabled)
 		return;
