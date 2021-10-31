@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2019, 2021 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -69,6 +69,7 @@
 #define DIAG_IOCTL_QUERY_PD_LOGGING	39
 #define DIAG_IOCTL_QUERY_CON_ALL	40
 #define DIAG_IOCTL_QUERY_MD_PID	41
+#define DIAG_IOCTL_MDM_HDLC_TOGGLE	44
 
 /* PC Tools IDs */
 #define APQ8060_TOOLS_ID	4062
