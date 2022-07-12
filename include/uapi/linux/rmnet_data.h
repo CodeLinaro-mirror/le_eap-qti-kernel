@@ -1,4 +1,5 @@
 /* Copyright (c) 2013-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -242,6 +243,13 @@ enum rmnet_config_return_codes_e {
 	RMNET_CONFIG_BAD_ARGUMENTS,
 	RMNET_CONFIG_BAD_EGRESS_DEVICE,
 	RMNET_CONFIG_TC_HANDLE_FULL
+};
+
+enum rmnet_ip_route_call_type {
+       RMNET_IP_ROUTE_CALL_TYPE_NONE,
+       RMNET_IP_ROUTE_CALL_TYPE_IP,
+       RMNET_IP_ROUTE_CALL_TYPE_NONIP,
+       RMNET_IP_ROUTE_CALL_TYPE_MAX,
 };
 
 #endif /* _RMNET_DATA_H_ */

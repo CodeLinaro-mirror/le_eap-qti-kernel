@@ -1,4 +1,5 @@
 /* Copyright (c) 2013-2014, 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -30,6 +31,7 @@ struct rmnet_endpoint {
 	};
 	struct net_device *egress_dev;
 	struct hlist_node hlnode;
+	u8 call_type;
 };
 
 struct rmnet_ip_route_endpoint {
@@ -73,6 +75,11 @@ struct rmnet_agg_page {
 struct rmnet_eth_hdr_info {
 	unsigned char src_mac_addr[MAX_ADDR_LEN];
 	unsigned char dst_mac_addr[MAX_ADDR_LEN];
+};
+
+struct rmnet_ip_route_config {
+	char dev_name[IFNAMSIZ];
+	u8   call_type;
 };
 
 /* One instance of this structure is instantiated for each real_dev associated
