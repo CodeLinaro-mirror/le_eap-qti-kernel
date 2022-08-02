@@ -1,4 +1,5 @@
 /* Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -123,12 +124,16 @@ static void rmnet_check_state(struct work_struct *work)
 
 int rmnet_active_check(void)
 {
+	struct task_struct *task;
 	rcu_read_lock();
+
+	task = find_task_by_vpid(rmnet_pid);
+        if (!task || strncmp(task->comm, APP_NAME, MAX_APP_LEN) != 0) {
+		goto end;
+	}
 
 	if (!test_and_set_bit(BIT0, &rmnet_sig_cfg.data_active)) {
 		rmnet_send_sig_to_lptd();
-		/* Cancel potential sysfs queue */
-		cancel_delayed_work_sync(&rmnet_sig_cfg.sig_work);
 		queue_delayed_work(rmnet_sig_cfg.rmnet_wq,
 				   &rmnet_sig_cfg.sig_work,
 				   msecs_to_jiffies(rmnet_timeout));
