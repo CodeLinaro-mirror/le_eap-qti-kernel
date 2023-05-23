@@ -21,6 +21,7 @@
 #include <linux/netdevice.h>
 #include <linux/version.h>
 #include <linux/inetdevice.h>
+#include <linux/rmnet_data.h>
 #include "rmnet_config.h"
 #include "rmnet_handlers.h"
 #include "rmnet_vnd.h"
@@ -56,6 +57,7 @@ enum {
 	IFLA_RMNET_DFC_QOS = __IFLA_RMNET_MAX,
 	IFLA_RMNET_UL_AGG_PARAMS,
 	IFLA_RMNET_ETH,
+	IFLA_RMNET_IP_ROUTE_CONFIG,
 	__IFLA_RMNET_EXT_MAX,
 };
 
@@ -75,6 +77,9 @@ static const struct nla_policy rmnet_policy[__IFLA_RMNET_EXT_MAX] = {
 	[IFLA_RMNET_ETH] = {
                 .len = sizeof(struct rmnet_eth_hdr_info)
         },
+	[IFLA_RMNET_IP_ROUTE_CONFIG] = {
+		.len = sizeof(struct rmnet_ip_route_config)
+	},
 };
 
 int rmnet_is_real_dev_registered(const struct net_device *real_dev)
@@ -359,6 +364,7 @@ static int rmnet_rtnl_validate(struct nlattr *tb[], struct nlattr *data[],
 #endif
 {
 	struct rmnet_egress_agg_params *agg_params;
+	struct rmnet_ip_route_config *iproute_cfg;
 	u16 mux_id;
 
 	if (!data) {
@@ -375,9 +381,29 @@ static int rmnet_rtnl_validate(struct nlattr *tb[], struct nlattr *data[],
 			if (agg_params->agg_time < 3000000)
 				return -EINVAL;
 		}
+
+		if (data[IFLA_RMNET_IP_ROUTE_CONFIG]) {
+			iproute_cfg = nla_data(data[IFLA_RMNET_IP_ROUTE_CONFIG]);
+			if (iproute_cfg->call_type <= RMNET_IP_ROUTE_CALL_TYPE_NONE ||
+				iproute_cfg->call_type >= RMNET_IP_ROUTE_CALL_TYPE_MAX)
+				return -EINVAL;
+		}
 	}
 
 	return 0;
+}
+
+static struct rmnet_endpoint *rmnet_get_iproute_ep_dev(struct rmnet_port *port,
+						       char *devname)
+{
+	struct rmnet_endpoint *ep;
+
+	hlist_for_each_entry_rcu(ep, &port->muxed_ep[0], hlnode) {
+		if (!memcmp(ep->egress_dev, devname, strlen(devname))) {
+			return ep;
+		}
+	}
+	return NULL;
 }
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0))
@@ -446,6 +472,26 @@ static int rmnet_changelink(struct net_device *dev, struct nlattr *tb[],
 		eth_hdr = nla_data(data[IFLA_RMNET_ETH]);
 		memcpy(&port->eth_hdr, eth_hdr,
 			sizeof(struct rmnet_eth_hdr_info));
+	}
+
+	if (data[IFLA_RMNET_IP_ROUTE_CONFIG]) {
+		struct rmnet_ip_route_config  *iproute_cfg;
+		struct rmnet_endpoint *ep;
+
+		if (port->data_format & RMNET_INGRESS_FORMAT_IP_ROUTE) {
+			iproute_cfg =
+				nla_data(data[IFLA_RMNET_IP_ROUTE_CONFIG]);
+			ep =
+				rmnet_get_iproute_ep_dev(port,
+						iproute_cfg->dev_name);
+			if (!ep)
+				return -ENODEV;
+
+			ep->call_type = iproute_cfg->call_type;
+			pr_err("%s(%d) dev:%s type:%d ep:%p ep_call_type:%d\n",
+				__func__, __LINE__, iproute_cfg->dev_name,
+				iproute_cfg->call_type, ep, ep->call_type);
+		}
 	}
 
 	return 0;
@@ -777,9 +823,12 @@ struct rmnet_endpoint *rmnet_get_ip6_route_endpoint(struct rmnet_port *port,
 						    struct in6_addr *saddr,
 						    struct in6_addr *daddr)
 {
-	struct rmnet_endpoint *ep;
+	struct rmnet_endpoint *ep, *ip_call_ep = NULL;
 
 	hlist_for_each_entry_rcu(ep, &port->muxed_ep[0], hlnode) {
+
+		if ((RMNET_IP_ROUTE_CALL_TYPE_IP == ep->call_type) && !ip_call_ep)
+			ip_call_ep = ep;
 
 		/* IP traffic will come as ll packet. Match with link local ep
 		 * if possible.
@@ -791,10 +840,8 @@ struct rmnet_endpoint *rmnet_get_ip6_route_endpoint(struct rmnet_port *port,
 		if (!memcmp(&ep->in6addr, daddr, sizeof(struct in6_addr))) {
 			return ep;
 		}
-
 	}
-
-	return NULL;
+	return ip_call_ep;
 }
 
 struct rmnet_endpoint *rmnet_get_ip4_route_endpoint(struct rmnet_port *port,
@@ -840,6 +887,7 @@ static int rmnet_addr6_event(struct notifier_block *unused,
 
 		memcpy(&ep->in6addr, &if6->addr, sizeof(struct in6_addr));
 		ep->egress_dev = dev;
+		ep->call_type = RMNET_IP_ROUTE_CALL_TYPE_NONE;
 
 		hlist_add_head_rcu(&ep->hlnode, &port->muxed_ep[0]);
 		break;
