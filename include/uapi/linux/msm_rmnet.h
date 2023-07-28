@@ -1,3 +1,9 @@
+/* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
+/*
+ * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ */
+
 #ifndef _UAPI_MSM_RMNET_H_
 #define _UAPI_MSM_RMNET_H_
 
@@ -76,6 +82,7 @@
 #define RMNET_IOCTL_EGRESS_FORMAT_AGGREGATION          (1<<2)
 #define RMNET_IOCTL_EGRESS_FORMAT_MUXING               (1<<3)
 #define RMNET_IOCTL_EGRESS_FORMAT_CHECKSUM             (1<<4)
+#define RMNET_IOCTL_EGRESS_FORMAT_IP_ROUTE             (1<<5)
 
 /* Input values for the RMNET_IOCTL_SET_INGRESS_DATA_FORMAT IOCTL */
 #define RMNET_IOCTL_INGRESS_FORMAT_MAP                 (1<<1)
@@ -83,6 +90,7 @@
 #define RMNET_IOCTL_INGRESS_FORMAT_DEMUXING            (1<<3)
 #define RMNET_IOCTL_INGRESS_FORMAT_CHECKSUM            (1<<4)
 #define RMNET_IOCTL_INGRESS_FORMAT_AGG_DATA            (1<<5)
+#define RMNET_IOCTL_INGRESS_FORMAT_IP_ROUTE            (1<<6)
 
 /* User space may not have this defined. */
 #ifndef IFNAMSIZ
