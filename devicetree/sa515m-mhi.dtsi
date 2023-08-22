@@ -13,7 +13,6 @@
 / {
 	aliases {
 		mhi2 = &mhi_2;
-		mhi_netdev5 = &mhi_netdev_5;
 		mhi_netdev7 = &mhi_netdev_7;
 	};
 
@@ -24,7 +23,7 @@
 	mhi_2: qcom,mhi-sa515m {
 		compatible = "qcom,mhi";
 
-		qcom,pci-dev-id = <0x0306>;
+		qcom,pci-dev-id = <0x030a>;
 		qcom,pci-domain = <0>;
 		qcom,pci-bus = <1>;
 		qcom,pci-slot = <0>;
@@ -35,7 +34,7 @@
 
 		/* mhi bus specific settings */
 		mhi,max-channels = <110>;
-		mhi,timeout = <2000>;
+		mhi,timeout = <22000>;
 		mhi,buffer-len = <0x4000>;
 
 		mhi_channels {
@@ -64,7 +63,7 @@
 				mhi,ee = <0x4>;
 			};
 
-			mhi_chan@4 {
+			/*mhi_chan@4 {
 				reg = <4>;
 				label = "DIAG";
 				mhi,num-elements = <64>;
@@ -84,13 +83,13 @@
 				mhi,data-type = <0>;
 				mhi,doorbell-mode = <2>;
 				mhi,ee = <0x4>;
-			};
+			};*/
 
 			mhi_chan@20 {
 				reg = <20>;
 				label = "IPCR";
 				mhi,num-elements = <64>;
-				mhi,event-ring = <1>;
+				mhi,event-ring = <2>;
 				mhi,chan-dir = <1>;
 				mhi,data-type = <1>;
 				mhi,doorbell-mode = <2>;
@@ -133,28 +132,6 @@
 				mhi,ee = <0x4>;
 			};
 
-			mhi_chan@100 {
-				reg = <100>;
-				label = "IP_HW0";
-				mhi,num-elements = <512>;
-				mhi,event-ring = <6>;
-				mhi,chan-dir = <1>;
-				mhi,data-type = <1>;
-				mhi,doorbell-mode = <3>;
-				mhi,ee = <0x4>;
-				mhi,db-mode-switch;
-			};
-
-			mhi_chan@101 {
-				reg = <101>;
-				label = "IP_HW0";
-				mhi,num-elements = <512>;
-				mhi,event-ring = <7>;
-				mhi,chan-dir = <2>;
-				mhi,data-type = <4>;
-				mhi,doorbell-mode = <3>;
-				mhi,ee = <0x4>;
-			};
 		};
 
 		mhi_events {
@@ -236,18 +213,11 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 
-			mhi_netdev_5: mhi_rmnet@0 {
-				reg = <0x0>;
-				mhi,chan = "IP_HW0";
-				mhi,interface-name = "rmnet_mhi";
-				mhi,mru = <0x4000>;
-				mhi,disable-chain-skb;
-			};
-
 			mhi_netdev_7: mhi_rmnet@2 {
 				reg = <0x2>;
 				mhi,chan = "IP_SW0";
 				mhi,interface-name = "mhi_swip";
+				mhi,ethernet-interface;
 				mhi,mru = <0x4000>;
 				mhi,disable-chain-skb;
 			};

@@ -1,0 +1,49 @@
+From 864d64fb8a70bdb51838f87b0681c1b5071ee8f9 Mon Sep 17 00:00:00 2001
+From: Sanjay Dwivedi <sanjaykd@codeaurora.org>
+Date: Wed, 1 Jul 2020 14:02:12 +0530
+Subject: [PATCH] [PATCH] Add support for upstream rmnet driver
+ 
+Signed-off-by: Sanjay Dwivedi <sanjaykd@codeaurora.org>
+---
+
+diff --git a/include/linux/net.h b/include/linux/net.h
+index 18d942bbdf6e..03664cf931ef 100644
+--- a/include/linux/net.h
++++ b/include/linux/net.h
+@@ -343,6 +343,7 @@ int kernel_sendpage(struct socket *sock, struct page *page, int offset,
+ int kernel_sendpage_locked(struct sock *sk, struct page *page, int offset,
+ 			   size_t size, int flags);
+ int kernel_sock_shutdown(struct socket *sock, enum sock_shutdown_cmd how);
++int kernel_sock_ioctl(struct socket *sock, int cmd, unsigned long arg);
+ 
+ /* Routine returns the IP overhead imposed by a (caller-protected) socket. */
+ u32 kernel_sock_ip_overhead(struct sock *sk);
+diff --git a/include/linux/netdevice.h b/include/linux/netdevice.h
+index eddf8ee270e7..d12dec08590c 100644
+--- a/include/linux/netdevice.h
++++ b/include/linux/netdevice.h
+@@ -5163,5 +5163,6 @@ extern struct list_head ptype_all __read_mostly;
+ extern struct list_head ptype_base[PTYPE_HASH_SIZE] __read_mostly;
+ 
+ extern struct net_device *blackhole_netdev;
++extern struct napi_struct *get_current_napi_context(void);
+ 
+ #endif	/* _LINUX_NETDEVICE_H */
+diff --git a/net/core/dev.c b/net/core/dev.c
+index 3be256051e99..f8e05ea01ca4 100644
+--- a/net/core/dev.c
++++ b/net/core/dev.c
+@@ -6481,6 +6481,13 @@ void __netif_napi_del(struct napi_struct *napi)
+ }
+ EXPORT_SYMBOL(__netif_napi_del);
+ 
++struct napi_struct *get_current_napi_context(void)
++{
++	struct softnet_data *sd = this_cpu_ptr(&softnet_data);
++	return &(sd->backlog);
++}
++EXPORT_SYMBOL(get_current_napi_context);
++
+ static int __napi_poll(struct napi_struct *n, bool *repoll)
+ {
+ 	int work, weight;
