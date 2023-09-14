@@ -616,11 +616,13 @@ static void mhi_status_cb(struct mhi_controller *mhi_cntrl,
 		 * we need to force a suspend so device can switch to
 		 * mission mode pcie phy settings.
 		 */
-		pm_runtime_get(dev);
-		ret = mhi_force_suspend(mhi_cntrl);
-		if (!ret)
-			mhi_runtime_resume(dev);
-		pm_runtime_put(dev);
+		if (!le_endpoint) {
+			pm_runtime_get(dev);
+			ret = mhi_force_suspend(mhi_cntrl);
+			if (!ret)
+				mhi_runtime_resume(dev);
+			pm_runtime_put(dev);
+		}
 		break;
 	default:
 		MHI_ERR("Unhandled cb:0x%x\n", reason);
