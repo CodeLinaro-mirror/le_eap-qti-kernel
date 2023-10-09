@@ -55,7 +55,6 @@ static void qcom_mhi_qrtr_dl_callback(struct mhi_device *mhi_dev,
 
 	if (!qdev || mhi_res->transaction_status)
 		return;
-	pr_err("%s: ++++ before qrtr_endpoint_post\n",__func__);
 	rc = qrtr_endpoint_post(&qdev->ep, mhi_res->buf_addr,
 				mhi_res->bytes_xferd);
 	if (rc == -EINVAL)
@@ -101,20 +100,17 @@ static int qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
 	kref_init(&pkt->refcount);
 	kref_get(&pkt->refcount);
 	pkt->skb = skb;
-	pr_err("%s: +++ before mhi_queue_transfer skb_len = %d, addr = %p\n",__func__, skb->len, skb->data); 
 	spin_lock_bh(&qdev->ul_lock);
 	list_add_tail(&pkt->node, &qdev->ul_pkts);
 	rc = mhi_queue_transfer(qdev->mhi_dev, DMA_TO_DEVICE, skb, skb->len,
 				MHI_EOT);
 	if (rc) {
-		pr_err("%s: +++ after mhi_queue_transfer +++++ , rc = %d\n",__func__, rc);
 		list_del(&pkt->node);
 		kfree_skb(skb);
 		kfree(pkt);
 		spin_unlock_bh(&qdev->ul_lock);
 		return rc;
 	}
-	pr_err("%s: +++ after mhi_queue_transfer , rc = %d\n",__func__, rc);
 	spin_unlock_bh(&qdev->ul_lock);
 	if (skb->sk)
 		sock_hold(skb->sk);
@@ -136,7 +132,6 @@ static int qcom_mhi_qrtr_probe(struct mhi_device *mhi_dev,
 	u32 net_id;
 	bool rt;
 	int rc;
-	pr_err("%s: +++ begin\n",__func__);
 	qdev = devm_kzalloc(&mhi_dev->dev, sizeof(*qdev), GFP_KERNEL);
 	if (!qdev)
 		return -ENOMEM;
@@ -161,7 +156,6 @@ static int qcom_mhi_qrtr_probe(struct mhi_device *mhi_dev,
 	dev_set_drvdata(&mhi_dev->dev, qdev);
 
 	dev_dbg(qdev->dev, "QTI MHI QRTR driver probed\n");
-	pr_err("%s: ++++ end\n",__func__);
 	return 0;
 }
 

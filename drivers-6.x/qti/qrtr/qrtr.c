@@ -51,7 +51,7 @@ static inline void *ipc_log_context_create(int max_num_pages,
 #define QRTR_LOG_PAGE_CNT 4
 
 #define QRTR_INFO(ctx, x, ...) do { \
-	pr_err(x, ##__VA_ARGS__); \
+	pr_debug(x, ##__VA_ARGS__); \
 	ipc_log_string(ctx, x, ##__VA_ARGS__); \
 } while (0)
 
@@ -245,13 +245,6 @@ static void qrtr_log_tx_msg(struct qrtr_node *node, struct qrtr_hdr_v1 *hdr,
 			  hdr->dst_node_id, hdr->dst_port_id,
 			  (unsigned int)pl_buf, (unsigned int)(pl_buf >> 32),
 			  current->comm);
-		pr_err("TX DATA: Len:0x%x CF:0x%x src[0x%x:0x%x] dst[0x%x:0x%x] [%08x %08x] [%s]\n",
-				 hdr->size, hdr->confirm_rx,
-				 hdr->src_node_id, hdr->src_port_id,
-				 hdr->dst_node_id, hdr->dst_port_id,
-				 (unsigned int)pl_buf, (unsigned int)(pl_buf >> 32),
-				 current->comm);
-				 
 	} else {
 		pkt = (struct qrtr_ctrl_pkt *)(skb->data + QRTR_HDR_MAX_SIZE);
 		if (hdr->type == QRTR_TYPE_NEW_SERVER ||
@@ -262,37 +255,25 @@ static void qrtr_log_tx_msg(struct qrtr_node *node, struct qrtr_hdr_v1 *hdr,
 				  le32_to_cpu(pkt->server.instance),
 				  le32_to_cpu(pkt->server.node),
 				  le32_to_cpu(pkt->server.port));
-			pr_err("TX CTRL: cmd:0x%x SVC[0x%x:0x%x] addr[0x%x:0x%x]\n",
-					hdr->type, le32_to_cpu(pkt->server.service),
-					le32_to_cpu(pkt->server.instance),
-					le32_to_cpu(pkt->server.node),
-					le32_to_cpu(pkt->server.port));
-		}	
+		}
 		else if (hdr->type == QRTR_TYPE_DEL_CLIENT ||
 			 hdr->type == QRTR_TYPE_RESUME_TX){
 			QRTR_INFO(node->ilc,
 				  "TX CTRL: cmd:0x%x addr[0x%x:0x%x]\n",
 				  hdr->type, le32_to_cpu(pkt->client.node),
 				  le32_to_cpu(pkt->client.port));
-			pr_err("TX CTRL: cmd:0x%x addr[0x%x:0x%x]\n",
-					hdr->type, le32_to_cpu(pkt->client.node),
-					le32_to_cpu(pkt->client.port));
-		}	
+		}
 		else if (hdr->type == QRTR_TYPE_HELLO ||
 			 hdr->type == QRTR_TYPE_BYE){
 			QRTR_INFO(node->ilc,
-				  "TX CTRL: cmd:0x%x node[0x%x]\n",				  
+				  "TX CTRL: cmd:0x%x node[0x%x]\n",
 				  hdr->type, hdr->src_node_id);
-			pr_err("TX CTRL: cmd:0x%x node[0x%x]\n",
-					hdr->type, hdr->src_node_id);
-		}	
+		}
 		else if (hdr->type == QRTR_TYPE_DEL_PROC){
 			QRTR_INFO(node->ilc,
 				  "TX CTRL: cmd:0x%x node[0x%x]\n",
 				  hdr->type, pkt->proc.node);
-			 pr_err("TX CTRL: cmd:0x%x node[0x%x]\n",
-					 hdr->type, pkt->proc.node);
-		}	 
+		}
 	}
 }
 
@@ -314,10 +295,6 @@ static void qrtr_log_rx_msg(struct qrtr_node *node, struct sk_buff *skb)
 			  skb->len, cb->confirm_rx, cb->src_node, cb->src_port,
 			  cb->dst_node, cb->dst_port,
 			  (unsigned int)pl_buf, (unsigned int)(pl_buf >> 32));
-		pr_err("RX DATA: Len:0x%x CF:0x%x src[0x%x:0x%x] dst[0x%x:0x%x] [%08x %08x]\n",
-				skb->len, cb->confirm_rx, cb->src_node, cb->src_port,
-				cb->dst_node, cb->dst_port,
-				(unsigned int)pl_buf, (unsigned int)(pl_buf >> 32));		
 	} else {
 		pkt = (struct qrtr_ctrl_pkt *)(skb->data);
 		if (cb->type == QRTR_TYPE_NEW_SERVER ||
@@ -328,30 +305,20 @@ static void qrtr_log_rx_msg(struct qrtr_node *node, struct sk_buff *skb)
 				  le32_to_cpu(pkt->server.instance),
 				  le32_to_cpu(pkt->server.node),
 				  le32_to_cpu(pkt->server.port));
-			 pr_err("RX CTRL: cmd:0x%x SVC[0x%x:0x%x] addr[0x%x:0x%x]\n",
-				cb->type, le32_to_cpu(pkt->server.service),
-				le32_to_cpu(pkt->server.instance),
-				le32_to_cpu(pkt->server.node),
-				le32_to_cpu(pkt->server.port));
-		}	 
+		}
 		else if (cb->type == QRTR_TYPE_DEL_CLIENT ||
 			 cb->type == QRTR_TYPE_RESUME_TX){
 			QRTR_INFO(node->ilc,
 				  "RX CTRL: cmd:0x%x addr[0x%x:0x%x]\n",
 				  cb->type, le32_to_cpu(pkt->client.node),
 				  le32_to_cpu(pkt->client.port));
-			pr_err("RX CTRL: cmd:0x%x addr[0x%x:0x%x]\n",
-					cb->type, le32_to_cpu(pkt->client.node),
-					le32_to_cpu(pkt->client.port));
-		}	
+		}
 		else if (cb->type == QRTR_TYPE_HELLO ||
 			 cb->type == QRTR_TYPE_BYE){
 			QRTR_INFO(node->ilc,
 				  "RX CTRL: cmd:0x%x node[0x%x]\n",
 				  cb->type, cb->src_node);
-			pr_err("RX CTRL: cmd:0x%x node[0x%x]\n",
-					 cb->type, cb->src_node);
-		}	
+		}
 	}
 }
 
@@ -632,7 +599,6 @@ static int qrtr_node_enqueue(struct qrtr_node *node, struct sk_buff *skb,
 	hdr->dst_port_id = cpu_to_le32(to->sq_port);
 	hdr->size = cpu_to_le32(len);
 	hdr->confirm_rx = !!confirm_rx;
-	pr_err("%s: +++ before xmit\n",__func__);
 	qrtr_log_tx_msg(node, hdr, skb);
 	rc = skb_put_padto(skb, ALIGN(len, 4) + sizeof(*hdr));
 	if (rc) {
@@ -1079,7 +1045,6 @@ static void qrtr_hello_work(struct kthread_work *work)
 	pkt->cmd = cpu_to_le32(QRTR_TYPE_HELLO);
 	from.sq_node = qrtr_local_nid;
 	to.sq_node = node->nid;
-	pr_err("%s: +++ before enqueue\n",__func__);
 	qrtr_node_enqueue(node, skb, QRTR_TYPE_HELLO, &from, &to, 0);
 	qrtr_port_put(ctrl);
 }
