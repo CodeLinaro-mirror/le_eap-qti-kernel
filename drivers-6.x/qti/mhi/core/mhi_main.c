@@ -435,12 +435,10 @@ int mhi_queue_skb(struct mhi_device *mhi_dev,
 		atomic_inc(&mhi_cntrl->pending_pkts);
 
 	if (likely(MHI_DB_ACCESS_VALID(mhi_cntrl))) {
-		if(mhi_chan->chan == 20 || mhi_chan->chan == 21){
 		read_lock_bh(&mhi_chan->lock);
 		
 		mhi_ring_chan_db(mhi_cntrl, mhi_chan);
 		read_unlock_bh(&mhi_chan->lock);
-		}
 	}
 
 	read_unlock_bh(&mhi_cntrl->pm_lock);
@@ -1647,7 +1645,7 @@ int mhi_send_cmd(struct mhi_controller *mhi_cntrl,
 	return 0;
 }
 
-static int __mhi_prepare_channel(struct mhi_controller *mhi_cntrl,
+int mhi_prepare_channel(struct mhi_controller *mhi_cntrl,
 				 struct mhi_chan *mhi_chan)
 {
 	int ret = 0;
@@ -2035,7 +2033,7 @@ int mhi_prepare_for_transfer(struct mhi_device *mhi_dev)
 		if (!mhi_chan)
 			continue;
 
-		ret = __mhi_prepare_channel(mhi_cntrl, mhi_chan);
+		ret = mhi_prepare_channel(mhi_cntrl, mhi_chan);
 		if (ret) {
 			MHI_ERR("Error moving chan %s,%d to START state\n",
 				mhi_chan->name, mhi_chan->chan);
