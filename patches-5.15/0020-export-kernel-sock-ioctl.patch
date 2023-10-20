@@ -1,0 +1,27 @@
+From 864d64fb8a70bdb51838f87b0681c1b5071ee8f9 Mon Sep 17 00:00:00 2001
+From: Raghava Chowdam <quic_rchowdam@quicinc.com> 
+Date: Wed, 30 Aug 2023 14:02:12 +0530
+Subject: [PATCH] [PATCH] Add support for upstream rmnet driver
+
+Signed-off-by: Raghava Chowdam <quic_rchowdam@quicinc.com>
+---
+
+diff --git a/net/socket.c b/net/socket.c
+index 00da9ce3dba0..092102f95973 100644
+--- a/net/socket.c
++++ b/net/socket.c
+@@ -3651,3 +3651,14 @@ u32 kernel_sock_ip_overhead(struct sock *sk)
+ 	}
+ }
+ EXPORT_SYMBOL(kernel_sock_ip_overhead);
++
++int kernel_sock_ioctl(struct socket *sock, int cmd, unsigned long arg)
++{
++        int err;
++
++        err = sock->ops->ioctl(sock, cmd, arg);
++
++        return err;
++}
++EXPORT_SYMBOL(kernel_sock_ioctl);
++
