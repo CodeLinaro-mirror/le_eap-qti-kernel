@@ -40,6 +40,14 @@ do_unpack_extra () {
 	rm -rf ${WORKDIR}/eap-qti-kernel/drivers
 	mv ${WORKDIR}/eap-qti-kernel/drivers-5.x ${WORKDIR}/eap-qti-kernel/drivers
     fi
+    if [ "${@d.getVar('LINUX_VERSION')[0:4]}" = "5.15" ]; then
+        rm -rf ${WORKDIR}/eap-qti-kernel/drivers
+        mv ${WORKDIR}/eap-qti-kernel/drivers-5.15 ${WORKDIR}/eap-qti-kernel/drivers
+    fi
+    if [ "${@d.getVar('LINUX_VERSION')[0:3]}" == "6.1" ]; then
+            rm -rf ${WORKDIR}/eap-qti-kernel/drivers
+	    cp -r ${WORKDIR}/eap-qti-kernel/drivers-6.x ${WORKDIR}/eap-qti-kernel/drivers
+    fi
 
     cp -r ${WORKDIR}/eap-qti-kernel/* ${S}/
 
@@ -120,13 +128,80 @@ do_unpack_extra () {
         git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/012-net-usbnet-Update-net_device-stats-for-RmNet-device-.patch
         git apply ${WORKDIR}/eap-qti-kernel/patches-5.4/013-usb-gadget-Fix-crash-on-calling-usb-gadget-activate-.patch
         cd -
+    elif [ "${@d.getVar('LINUX_VERSION')[0:4]}" = "5.15" ]; then
+        cd ${S}
+	sed -e '/CONFIG_QTI_RMNET/d' ${WORKDIR}/eap-qti-kernel/defconfig -i ${WORKDIR}/eap-qti-kernel/defconfig
+        sed -e '/CONFIG_QTI_QMI_RMNET/d' ${WORKDIR}/eap-qti-kernel/defconfig -i ${WORKDIR}/eap-qti-kernel/defconfig
+        sed -e '/CONFIG_QTI_RMNET_CTL/d' ${WORKDIR}/eap-qti-kernel/defconfig -i ${WORKDIR}/eap-qti-kernel/defconfig
+        sed -e '/CONFIG_QTI_QMI_DFC/d' ${WORKDIR}/eap-qti-kernel/defconfig -i ${WORKDIR}/eap-qti-kernel/defconfig
+        if git apply --check "${WORKDIR}/eap-qti-kernel/patches-5.15/008-Add-support-for-kernel-API-used-in-daig-and-mhi.patch"; then
+                echo "success"
+                git apply ${WORKDIR}/eap-qti-kernel/patches-5.15/008-Add-support-for-kernel-API-used-in-daig-and-mhi.patch
+        else
+                echo "fail"
+        fi
+        if git apply --check "${WORKDIR}/eap-qti-kernel/patches-5.15/010-net-cdc_ether-Ensure-that-default-MTU-is-minimum-204.patch"; then
+                echo "success"
+                git apply ${WORKDIR}/eap-qti-kernel/patches-5.15/010-net-cdc_ether-Ensure-that-default-MTU-is-minimum-204.patch
+        else
+                echo "fail"
+        fi
+        if git apply --check "${WORKDIR}/eap-qti-kernel/patches-5.15/012-net-usbnet-Update-net_device-stats-for-RmNet-device-.patch"; then
+                echo "success"
+        git apply ${WORKDIR}/eap-qti-kernel/patches-5.15/012-net-usbnet-Update-net_device-stats-for-RmNet-device-.patch
+        else
+                echo "fail"
+        fi
+        if git apply --check "${WORKDIR}/eap-qti-kernel/patches-5.15/0020-export-kernel-sock-ioctl.patch"; then
+                echo "success"
+                git apply ${WORKDIR}/eap-qti-kernel/patches-5.15/0020-export-kernel-sock-ioctl.patch
+        else
+                echo "fail"
+        fi
+        cd -
+    elif [ "${@d.getVar('LINUX_VERSION')[0:3]}" = "6.1" ]; then
+	cd ${S}
+        sed -e '/CONFIG_QTI_RMNET/d' ${WORKDIR}/eap-qti-kernel/defconfig -i ${WORKDIR}/eap-qti-kernel/defconfig
+        sed -e '/CONFIG_QTI_QMI_RMNET/d' ${WORKDIR}/eap-qti-kernel/defconfig -i ${WORKDIR}/eap-qti-kernel/defconfig
+        sed -e '/CONFIG_QTI_RMNET_CTL/d' ${WORKDIR}/eap-qti-kernel/defconfig -i ${WORKDIR}/eap-qti-kernel/defconfig
+        sed -e '/CONFIG_QTI_QMI_DFC/d' ${WORKDIR}/eap-qti-kernel/defconfig -i ${WORKDIR}/eap-qti-kernel/defconfig
+	if git apply --check "${WORKDIR}/eap-qti-kernel/patches-6.1/008-Add-support-for-kernel-API-used-in-daig-and-mhi.patch"; then
+		echo "success"
+		git apply ${WORKDIR}/eap-qti-kernel/patches-6.1/008-Add-support-for-kernel-API-used-in-daig-and-mhi.patch
+	else
+		echo "fail"
+	fi
+	if git apply --check "${WORKDIR}/eap-qti-kernel/patches-6.1/010-net-cdc_ether-Ensure-that-default-MTU-is-minimum-204.patch"; then
+		echo "success"
+		git apply ${WORKDIR}/eap-qti-kernel/patches-6.1/010-net-cdc_ether-Ensure-that-default-MTU-is-minimum-204.patch
+	else
+		echo "fail"
+	fi
+	if git apply --check "${WORKDIR}/eap-qti-kernel/patches-6.1/012-net-usbnet-Update-net_device-stats-for-RmNet-device-.patch"; then
+		echo "success"
+	git apply ${WORKDIR}/eap-qti-kernel/patches-6.1/012-net-usbnet-Update-net_device-stats-for-RmNet-device-.patch
+	else
+		echo "fail"
+	fi
+	if git apply --check "${WORKDIR}/eap-qti-kernel/patches-6.1/0020-export-kernel-sock-ioctl.patch"; then
+		echo "success"
+		git apply ${WORKDIR}/eap-qti-kernel/patches-6.1/0020-export-kernel-sock-ioctl.patch
+	else
+		echo "fail"
+	fi
+	cd -
     else
         bbfatal "Kernel version ${LINUX_VERSION} is not supported"
     fi
 }
 
-addtask unpack_extra after do_unpack before do_patch
-
-do_preconfigure_prepend () {
+addtask unpack_extra after do_kernel_metadata before do_patch
+addtask do_preconfigure after do_merge_delta_config before do_configure
+addtask do_copy after do_configure before do_compile
+do_preconfigure () {
     cat ${WORKDIR}/eap-qti-kernel/defconfig >> ${WORKDIR}/defconfig
+}
+
+do_copy() {
+        cp ${WORKDIR}/defconfig ${WORKDIR}/build/.config
 }
