@@ -1,0 +1,34 @@
+From 0d9d336f7d6a7104201f5a6c791f802f65e4e451 Mon Sep 17 00:00:00 2001
+From: Raghava Chowdam <quic_rchowdam@quicinc.com>
+Date: Mon, 27 Nov 2023 11:22:59 +0530
+Subject: [PATCH] mhi_bus-core-Add-support-for-MHI-host-interface.patch
+
+Signed-off-by: Raghava Chowdam <quic_rchowdam@quicinc.com>
+---
+ include/linux/mod_devicetable.h | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/include/linux/mod_devicetable.h b/include/linux/mod_devicetable.h
+index 5b08a473cdba..fbafaf51ec65 100644
+--- a/include/linux/mod_devicetable.h
++++ b/include/linux/mod_devicetable.h
+@@ -759,6 +759,19 @@ struct fsl_mc_device_id {
+ 	const char obj_type[16];
+ };
+ 
++#define MHI_NAME_SIZE 32
++
++/**
++ * struct mhi_device_id - MHI device identification
++ * @chan: MHI channel name
++ * @driver_data: driver data;
++ */
++
++struct mhi_device_id {
++       const char chan[MHI_NAME_SIZE];
++       kernel_ulong_t driver_data;
++};
++
+ /**
+  * struct tb_service_id - Thunderbolt service identifiers
+  * @match_flags: Flags used to match the structure

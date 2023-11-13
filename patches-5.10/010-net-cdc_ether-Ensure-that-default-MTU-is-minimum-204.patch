@@ -1,0 +1,24 @@
+From 957dec18a043378cf22cd531dbe68fcb60b2bd18 Mon Sep 17 00:00:00 2001
+From: Raghava Chowdam <quic_rchowdam@quicinc.com>
+Date: Mon, 27 Nov 2023 11:25:41 +0530
+Subject: [PATCH] net-cdc_ether-Ensure-that-default-MTU-is-minimum-204.patch
+
+Signed-off-by: Raghava Chowdam <quic_rchowdam@quicinc.com>
+---
+ drivers/net/usb/cdc_ether.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/net/usb/cdc_ether.c b/drivers/net/usb/cdc_ether.c
+index 935cd296887f..66766c4c7619 100644
+--- a/drivers/net/usb/cdc_ether.c
++++ b/drivers/net/usb/cdc_ether.c
+@@ -310,6 +310,9 @@ int usbnet_generic_cdc_bind(struct usbnet *dev, struct usb_interface *intf)
+ 		return -ENODEV;
+ 	}
+ 
++	if(dev->hard_mtu < 2048)
++               dev->hard_mtu = 2048;
++
+ 	return 0;
+ 
+ bad_desc:
