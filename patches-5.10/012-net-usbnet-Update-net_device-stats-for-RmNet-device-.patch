@@ -1,0 +1,36 @@
+From 6a4e23b4cff30ee74cdf3a33d74a3d655b706239 Mon Sep 17 00:00:00 2001
+From: Raghava Chowdam <quic_rchowdam@quicinc.com>
+Date: Mon, 27 Nov 2023 11:28:10 +0530
+Subject: [PATCH] net-usbnet-Update-net_device-stats-for-RmNet-device-.patch
+
+Signed-off-by: Raghava Chowdam <quic_rchowdam@quicinc.com>
+---
+ drivers/net/usb/usbnet.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/net/usb/usbnet.c b/drivers/net/usb/usbnet.c
+index 43d70348343b..298642086bba 100644
+--- a/drivers/net/usb/usbnet.c
++++ b/drivers/net/usb/usbnet.c
+@@ -320,6 +320,10 @@ void usbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
+ 	flags = u64_stats_update_begin_irqsave(&stats64->syncp);
+ 	stats64->rx_packets++;
+ 	stats64->rx_bytes += skb->len;
++	if (dev->net->netdev_ops->ndo_get_stats) {
++               dev->net->stats.rx_packets++;
++               dev->net->stats.rx_bytes += skb->len;
++       }
+ 	u64_stats_update_end_irqrestore(&stats64->syncp, flags);
+ 
+ 	netif_dbg(dev, rx_status, dev->net, "< rx, len %zu, type 0x%x\n",
+@@ -1224,6 +1228,10 @@ static void tx_complete (struct urb *urb)
+ 		flags = u64_stats_update_begin_irqsave(&stats64->syncp);
+ 		stats64->tx_packets += entry->packets;
+ 		stats64->tx_bytes += entry->length;
++		if (dev->net->netdev_ops->ndo_get_stats) {
++                       dev->net->stats.tx_packets += entry->packets;
++                       dev->net->stats.tx_bytes += entry->length;
++               }
+ 		u64_stats_update_end_irqrestore(&stats64->syncp, flags);
+ 	} else {
+ 		dev->net->stats.tx_errors++;

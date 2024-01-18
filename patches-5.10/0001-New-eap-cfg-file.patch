@@ -1,0 +1,46 @@
+From 6ead2fc0d0fff70b22356e6d408301a0bde15bdc Mon Sep 17 00:00:00 2001
+From: Raghava Chowdam <quic_rchowdam@quicinc.com>
+Date: Fri, 10 Nov 2023 19:30:09 +0530
+Subject: [PATCH] New eap cfg file
+
+Signed-off-by: Raghava Chowdam <quic_rchowdam@quicinc.com>
+---
+ ti_config_fragments/eap_qc.cfg | 2 ++
+ 1 file changed, 2 insertions(+)
+ create mode 100644 ti_config_fragments/eap_qc.cfg
+
+diff --git a/ti_config_fragments/eap_qc.cfg b/ti_config_fragments/eap_qc.cfg
+new file mode 100644
+index 000000000000..91882f35590c
+--- /dev/null
++++ b/ti_config_fragments/eap_qc.cfg
+@@ -0,0 +1,15 @@
++CONFIG_USB=y
++CONFIG_USB_GADGET=y
++CONFIG_QTI_QRTR=y
++CONFIG_QTI_QRTR_USB=y
++CONFIG_USB_USBNET=y
++CONFIG_USB_NET_RNDIS_HOST=y
++CONFIG_QTI_QMI_HELPERS=y
++CONFIG_QTI_USB_KS_BRIDGE=y
++CONFIG_QTI_DIAG_CHAR=y
++CONFIG_QTI_USB_F_DIAG=y
++CONFIG_QTI_USB_DIAG_BRIDGE=y
++CONFIG_QTI_USB_BRIDGE=y
++CONFIG_QTI_USB_MDM_DATA_BRIDGE=y
++CONFIG_SDX_EXT_IPC=y
++CONFIG_QTI_NOTIFY_SIDEBAND=y
+diff --git a/ti_config_fragments/v8_defconfig_map.txt b/ti_config_fragments/v8_defconfig_map.txt
+index 278cfa36e744..2ea892d82a73 100644
+--- a/ti_config_fragments/v8_defconfig_map.txt
++++ b/ti_config_fragments/v8_defconfig_map.txt
+@@ -1,5 +1,5 @@
+ # Release Defconfigs
+-classification: SDK_Release_Defconfigs type: ti_sdk_arm64_release defconfig: defconfig config_file: None extra_configs: arm64_prune.cfg v8_baseport.cfg v8_ipc.cfg connectivity.cfg v8_audio_display.cfg v8_multimedia.cfg systemd.cfg containers.cfg
++classification: SDK_Release_Defconfigs type: ti_sdk_arm64_release defconfig: defconfig config_file: None extra_configs: arm64_prune.cfg v8_baseport.cfg v8_ipc.cfg connectivity.cfg v8_audio_display.cfg v8_multimedia.cfg systemd.cfg containers.cfg eap_qc.cfg
+ # Debug Defconfigs
+ classification: SDK_Debug_Defconfigs type: ti_sdk_arm64_debug defconfig: defconfig config_file: None extra_configs: arm64_prune.cfg v8_baseport.cfg v8_ipc.cfg connectivity.cfg v8_audio_display.cfg v8_multimedia.cfg systemd.cfg containers.cfg debug_options.cfg
+ # RT Defconfigs
+-- 
+2.17.1
+

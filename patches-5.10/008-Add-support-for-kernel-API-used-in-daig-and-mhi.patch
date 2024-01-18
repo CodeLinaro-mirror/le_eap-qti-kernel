@@ -1,0 +1,74 @@
+From 8c0c81d731d4f52d16e7b67238569502e72284ef Mon Sep 17 00:00:00 2001
+From: Raghava Chowdam <quic_rchowdam@quicinc.com>
+Date: Mon, 27 Nov 2023 11:16:15 +0530
+Subject: [PATCH] Add-support-for-kernel-API-used-in-daig-and-mhi.patch
+
+Signed-off-by: Raghava Chowdam <quic_rchowdam@quicinc.com>
+---
+ include/linux/net.h       |  2 +-
+ include/linux/netdevice.h |  2 +-
+ net/core/dev.c            |  8 ++++++++
+ net/socket.c              | 10 ++++++++++
+ 4 files changed, 20 insertions(+), 2 deletions(-)
+
+diff --git a/include/linux/net.h b/include/linux/net.h
+index ae713c851342..173ac0e8064f 100644
+--- a/include/linux/net.h
++++ b/include/linux/net.h
+@@ -321,7 +321,7 @@ int kernel_sendpage(struct socket *sock, struct page *page, int offset,
+ int kernel_sendpage_locked(struct sock *sk, struct page *page, int offset,
+ 			   size_t size, int flags);
+ int kernel_sock_shutdown(struct socket *sock, enum sock_shutdown_cmd how);
+-
++int kernel_sock_ioctl(struct socket *sock, int cmd, unsigned long arg);
+ /* Routine returns the IP overhead imposed by a (caller-protected) socket. */
+ u32 kernel_sock_ip_overhead(struct sock *sk);
+ 
+diff --git a/include/linux/netdevice.h b/include/linux/netdevice.h
+index 6a4353f8589c..345deaa3837e 100644
+--- a/include/linux/netdevice.h
++++ b/include/linux/netdevice.h
+@@ -5258,5 +5258,5 @@ do {								\
+ #define PTYPE_HASH_MASK	(PTYPE_HASH_SIZE - 1)
+ 
+ extern struct net_device *blackhole_netdev;
+-
++extern struct napi_struct *get_current_napi_context(void);
+ #endif	/* _LINUX_NETDEVICE_H */
+diff --git a/net/core/dev.c b/net/core/dev.c
+index 34b5aab42b91..eba903f1c327 100644
+--- a/net/core/dev.c
++++ b/net/core/dev.c
+@@ -6810,6 +6810,14 @@ void __netif_napi_del(struct napi_struct *napi)
+ }
+ EXPORT_SYMBOL(__netif_napi_del);
+ 
++struct napi_struct *get_current_napi_context(void)
++{
++        struct softnet_data *sd = this_cpu_ptr(&softnet_data);
++
++        return &(sd->backlog);
++}
++EXPORT_SYMBOL(get_current_napi_context);
++
+ static int napi_poll(struct napi_struct *n, struct list_head *repoll)
+ {
+ 	void *have;
+diff --git a/net/socket.c b/net/socket.c
+index eb5bbe335941..5111f45e318d 100644
+--- a/net/socket.c
++++ b/net/socket.c
+@@ -3636,3 +3636,13 @@ u32 kernel_sock_ip_overhead(struct sock *sk)
+ 	}
+ }
+ EXPORT_SYMBOL(kernel_sock_ip_overhead);
++
++int kernel_sock_ioctl(struct socket *sock, int cmd, unsigned long arg)
++{
++        int err;
++
++        err = sock->ops->ioctl(sock, cmd, arg);
++
++        return err;
++}
++EXPORT_SYMBOL(kernel_sock_ioctl);
