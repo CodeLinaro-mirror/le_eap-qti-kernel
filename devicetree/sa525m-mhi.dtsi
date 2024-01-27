@@ -93,7 +93,7 @@
 			mhi_chan@46 {
 				reg = <46>;
 				label = "IP_SW0";
-				mhi,num-elements = <512>;
+				mhi,num-elements = <1024>;
 				mhi,event-ring = <4>;
 				mhi,chan-dir = <1>;
 				mhi,data-type = <1>;
@@ -104,10 +104,10 @@
 			mhi_chan@47 {
 				reg = <47>;
 				label = "IP_SW0";
-				mhi,num-elements = <512>;
+				mhi,num-elements = <1024>;
 				mhi,event-ring = <5>;
 				mhi,chan-dir = <2>;
-				mhi,data-type = <4>;
+				mhi,data-type = <1>;
 				mhi,doorbell-mode = <2>;
 				mhi,ee = <0x4>;
 			};
