@@ -8,6 +8,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 / {
@@ -20,7 +23,7 @@
 		compatible = "qcom,pcie_ssr";
 	};
 
-	mhi_2: qcom,mhi-sa515m {
+	mhi_2: qcom,mhi-sa525m {
 		compatible = "qcom,mhi";
 
 		qcom,pci-dev-id = <0x030a>;

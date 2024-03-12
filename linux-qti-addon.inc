@@ -24,6 +24,10 @@
 # WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
 # OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 # IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# Changes from Qualcomm Innovation Center are provided under the following license:
+# Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
 
 FILESEXTRAPATHS_append := ":${WORKSPACE}/sources"
 
@@ -54,32 +58,27 @@ do_unpack_extra () {
     echo "header-y += rmnet_data.h" >> ${S}/include/uapi/linux/Kbuild
 
     if [ -e ${S}/arch/arm/boot/dts/imx6q-sabrelite.dts ]; then
-        echo "#include \"sa415m-mhi.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6q-sabrelite.dts
-        echo "#include \"sa515m-mhi.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6q-sabrelite.dts
+        echo "#include \"sa525m-mhi.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6q-sabrelite.dts
 	echo "#include \"eap_diag.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6q-sabrelite.dts
     fi
 
     if [ -e ${S}/arch/arm/boot/dts/imx6sx.dtsi ]; then
-        echo "#include \"sa415m-mhi.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6sx.dtsi
-        echo "#include \"sa515m-mhi.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6sx.dtsi
+        echo "#include \"sa525m-mhi.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6sx.dtsi
 	echo "#include \"eap_diag.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6sx.dtsi
     fi
 
     if [ -e ${S}/arch/arm/boot/dts/imx6qdl.dtsi ]; then
-        echo "#include \"sa415m-mhi.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6qdl.dtsi
-        echo "#include \"sa515m-mhi.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6qdl.dtsi
+        echo "#include \"sa525m-mhi.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6qdl.dtsi
 	echo "#include \"eap_diag.dtsi\"" >> ${S}/arch/arm/boot/dts/imx6qdl.dtsi
     fi
 
     if [ -e ${S}/arch/arm64/boot/dts/freescale/fsl-imx8dx.dtsi ]; then
-        echo "#include \"sa415m-mhi.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/fsl-imx8dx.dtsi
-        echo "#include \"sa515m-mhi.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/fsl-imx8dx.dtsi
+        echo "#include \"sa525m-mhi.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/fsl-imx8dx.dtsi
 	echo "#include \"eap_diag.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/fsl-imx8dx.dtsi
     fi
 
     if [ -e ${S}/arch/arm64/boot/dts/freescale/imx8qxp.dtsi ]; then
-        echo "#include \"sa415m-mhi.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-        echo "#include \"sa515m-mhi.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+        echo "#include \"sa525m-mhi.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
         echo "#include \"eap_diag.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
     fi
 
