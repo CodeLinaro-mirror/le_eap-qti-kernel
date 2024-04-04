@@ -16,6 +16,7 @@
 	aliases {
 		mhi2 = &mhi_2;
 		mhi_netdev7 = &mhi_netdev_7;
+		mhi_netdev8 = &mhi_netdev_8;
 	};
 
 	ssr: qcom,pcie_ssr {
@@ -111,6 +112,29 @@
 				mhi,ee = <0x4>;
 			};
 
+			mhi_chan@100 {
+				reg = <100>;
+				label = "IP_HW0";
+				mhi,num-elements = <512>;
+				mhi,event-ring = <6>;
+				mhi,chan-dir = <1>;
+				mhi,data-type = <1>;
+				mhi,doorbell-mode = <3>;
+				mhi,ee = <0x4>;
+				mhi,db-mode-switch;
+			};
+
+			mhi_chan@101 {
+				reg = <101>;
+				label = "IP_HW0";
+				mhi,num-elements = <512>;
+				mhi,event-ring = <7>;
+				mhi,chan-dir = <2>;
+				mhi,data-type = <4>;
+				mhi,doorbell-mode = <3>;
+				mhi,ee = <0x4>;
+			};
+
 		};
 
 		mhi_events {
@@ -165,6 +189,27 @@
 				mhi,brstmode = <2>;
 				mhi,client-manage;
 			};
+
+			mhi_event@6 {
+				mhi,num-elements = <1024>;
+				mhi,intmod = <5>;
+				mhi,msi = <5>;
+				mhi,chan = <100>;
+				mhi,priority = <1>;
+				mhi,brstmode = <3>;
+				mhi,hw-ev;
+			};
+
+			mhi_event@7 {
+				mhi,num-elements = <1024>;
+				mhi,intmod = <5>;
+				mhi,msi = <6>;
+				mhi,chan = <101>;
+				mhi,priority = <1>;
+				mhi,brstmode = <3>;
+				mhi,hw-ev;
+				mhi,client-manage;
+			};
 		};
 
 		mhi_devices {
@@ -176,6 +221,14 @@
 				mhi,chan = "IP_SW0";
 				mhi,interface-name = "mhi_swip";
 				mhi,ethernet-interface;
+				mhi,mru = <0x4000>;
+				mhi,disable-chain-skb;
+			};
+
+			mhi_netdev_8: mhi_rmnet@3 {
+				reg = <0x3>;
+				mhi,chan = "IP_HW0";
+				mhi,interface-name = "rmnet_mhi";
 				mhi,mru = <0x4000>;
 				mhi,disable-chain-skb;
 			};
