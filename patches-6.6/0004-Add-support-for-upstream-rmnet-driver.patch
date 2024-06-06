@@ -1,0 +1,43 @@
+From e65e1a7860b7b7196cd3378e5d38a34cbf92ca6b Mon Sep 17 00:00:00 2001
+From: Venkatesh Perumal <quic_venper@quicinc.com>
+Date: Wed, 17 Apr 2024 19:07:50 +0530
+Subject: [PATCH 4/4] Add support for upstream rmnet driver
+
+---
+ include/linux/net.h |  1 +
+ net/socket.c        | 10 ++++++++++
+ 2 files changed, 11 insertions(+)
+
+diff --git a/include/linux/net.h b/include/linux/net.h
+index c9b4a63791a4..28492e0db84c 100644
+--- a/include/linux/net.h
++++ b/include/linux/net.h
+@@ -341,6 +341,7 @@ int kernel_sock_shutdown(struct socket *sock, enum sock_shutdown_cmd how);
+ 
+ /* Routine returns the IP overhead imposed by a (caller-protected) socket. */
+ u32 kernel_sock_ip_overhead(struct sock *sk);
++int kernel_sock_ioctl(struct socket *sock, int cmd, unsigned long arg);
+ 
+ #define MODULE_ALIAS_NETPROTO(proto) \
+ 	MODULE_ALIAS("net-pf-" __stringify(proto))
+diff --git a/net/socket.c b/net/socket.c
+index c4a6f5532955..012cfe053008 100644
+--- a/net/socket.c
++++ b/net/socket.c
+@@ -3693,3 +3693,13 @@ u32 kernel_sock_ip_overhead(struct sock *sk)
+ 	}
+ }
+ EXPORT_SYMBOL(kernel_sock_ip_overhead);
++
++int kernel_sock_ioctl(struct socket *sock, int cmd, unsigned long arg)
++{
++        int err;
++
++        err = sock->ops->ioctl(sock, cmd, arg);
++
++        return err;
++}
++EXPORT_SYMBOL(kernel_sock_ioctl);
+-- 
+2.17.1
+

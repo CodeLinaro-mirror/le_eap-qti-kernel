@@ -1,0 +1,39 @@
+From 7cfd243af67bd44ae378bf72c38b9fb7df47cd03 Mon Sep 17 00:00:00 2001
+From: Venkatesh Perumal <quic_venper@quicinc.com>
+Date: Wed, 17 Apr 2024 19:01:11 +0530
+Subject: [PATCH 3/4] net: usbnet: Update net_device stats for RmNet device
+ only
+
+---
+ drivers/net/usb/usbnet.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/net/usb/usbnet.c b/drivers/net/usb/usbnet.c
+index 2d14b0d78541..0fca43060261 100644
+--- a/drivers/net/usb/usbnet.c
++++ b/drivers/net/usb/usbnet.c
+@@ -336,6 +336,10 @@ void usbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
+ 	flags = u64_stats_update_begin_irqsave(&stats64->syncp);
+ 	u64_stats_inc(&stats64->rx_packets);
+ 	u64_stats_add(&stats64->rx_bytes, skb->len);
++	if (dev->net->netdev_ops->ndo_get_stats) {
++		dev->net->stats.rx_packets++;
++		dev->net->stats.rx_bytes += skb->len;
++	}	
+ 	u64_stats_update_end_irqrestore(&stats64->syncp, flags);
+ 
+ 	netif_dbg(dev, rx_status, dev->net, "< rx, len %zu, type 0x%x\n",
+@@ -1253,6 +1257,10 @@ static void tx_complete (struct urb *urb)
+ 		flags = u64_stats_update_begin_irqsave(&stats64->syncp);
+ 		u64_stats_add(&stats64->tx_packets, entry->packets);
+ 		u64_stats_add(&stats64->tx_bytes, entry->length);
++		if (dev->net->netdev_ops->ndo_get_stats) {
++			dev->net->stats.tx_packets += entry->packets;
++			dev->net->stats.tx_bytes += entry->length;
++		}		
+ 		u64_stats_update_end_irqrestore(&stats64->syncp, flags);
+ 	} else {
+ 		dev->net->stats.tx_errors++;
+-- 
+2.17.1
+
