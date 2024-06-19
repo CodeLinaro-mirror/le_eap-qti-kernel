@@ -8,6 +8,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
+ *
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
  */
 
 #include <linux/cdev.h>
@@ -687,7 +690,7 @@ static int mhi_uci_init(void)
 		return ret;
 
 	mhi_uci_drv.major = ret;
-	mhi_uci_drv.class = class_create(THIS_MODULE, MHI_UCI_DRIVER_NAME);
+	mhi_uci_drv.class = class_create(MHI_UCI_DRIVER_NAME);
 	if (IS_ERR(mhi_uci_drv.class))
 		return -ENODEV;
 

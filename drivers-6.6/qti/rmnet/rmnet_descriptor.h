@@ -9,6 +9,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
  * RMNET Packet Descriptor Framework
  *
  */
@@ -125,7 +127,6 @@ static inline void rmnet_frag_fill(struct rmnet_frag_descriptor *frag_desc,
 				   struct page *p, u32 page_offset, u32 len)
 {
 	get_page(p);
-	__skb_frag_set_page(&frag_desc->frag, p);
 	skb_frag_size_set(&frag_desc->frag, len);
 	frag_desc->frag.bv_offset = page_offset;
 }

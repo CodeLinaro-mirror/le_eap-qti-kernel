@@ -8,6 +8,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
+ *
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
  */
 
 #include <linux/debugfs.h>
@@ -53,7 +56,7 @@ void mhi_rddm_prepare(struct mhi_controller *mhi_cntrl,
 		      lower_32_bits(mhi_buf->dma_addr));
 
 	mhi_write_reg(mhi_cntrl, base, BHIE_RXVECSIZE_OFFS, mhi_buf->len);
-	sequence_id = prandom_u32_max(PAGE_SIZE) & BHIE_RXVECSTATUS_SEQNUM_BMSK;
+	sequence_id = get_random_u32_below(PAGE_SIZE) & BHIE_RXVECSTATUS_SEQNUM_BMSK;
 
 	if (unlikely(!sequence_id))
 		sequence_id = 1;
@@ -206,7 +209,7 @@ static int mhi_fw_load_amss(struct mhi_controller *mhi_cntrl,
 
 	mhi_write_reg(mhi_cntrl, base, BHIE_TXVECSIZE_OFFS, mhi_buf->len);
 
-	mhi_cntrl->sequence_id = prandom_u32_max(PAGE_SIZE) & BHIE_TXVECSTATUS_SEQNUM_BMSK;
+	mhi_cntrl->sequence_id = get_random_u32_below(PAGE_SIZE) & BHIE_TXVECSTATUS_SEQNUM_BMSK;
 	mhi_write_reg_field(mhi_cntrl, base, BHIE_TXVECDB_OFFS,
 			    BHIE_TXVECDB_SEQNUM_BMSK, BHIE_TXVECDB_SEQNUM_SHFT,
 			    mhi_cntrl->sequence_id);
@@ -268,7 +271,7 @@ static int mhi_fw_load_sbl(struct mhi_controller *mhi_cntrl,
 	mhi_write_reg(mhi_cntrl, base, BHI_IMGADDR_LOW,
 		      lower_32_bits(dma_addr));
 	mhi_write_reg(mhi_cntrl, base, BHI_IMGSIZE, size);
-	mhi_cntrl->session_id = prandom_u32_max(PAGE_SIZE) & BHI_TXDB_SEQNUM_BMSK;
+	mhi_cntrl->session_id = get_random_u32_below(PAGE_SIZE) & BHI_TXDB_SEQNUM_BMSK;
 	mhi_write_reg(mhi_cntrl, base, BHI_IMGTXDB, mhi_cntrl->session_id);
 	read_unlock_bh(pm_lock);
 
