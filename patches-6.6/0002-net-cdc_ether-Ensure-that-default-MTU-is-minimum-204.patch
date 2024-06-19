@@ -1,0 +1,26 @@
+From 5abbb9948eb954afc10ec86f5c828ae5d62d11d6 Mon Sep 17 00:00:00 2001
+From: Venkatesh Perumal <quic_venper@quicinc.com>
+Date: Wed, 17 Apr 2024 18:58:26 +0530
+Subject: [PATCH 2/4] net: cdc_ether: Ensure that default MTU is minimum 2048
+
+---
+ drivers/net/usb/cdc_ether.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/net/usb/cdc_ether.c b/drivers/net/usb/cdc_ether.c
+index 6d61052353f0..27b9eea72e93 100644
+--- a/drivers/net/usb/cdc_ether.c
++++ b/drivers/net/usb/cdc_ether.c
+@@ -325,6 +325,9 @@ int usbnet_generic_cdc_bind(struct usbnet *dev, struct usb_interface *intf)
+ 	/* override ethtool_ops */
+ 	dev->net->ethtool_ops = &cdc_ether_ethtool_ops;
+ 
++	if(dev->hard_mtu < 2048)
++		dev->hard_mtu = 2048;
++
+ 	return 0;
+ 
+ bad_desc:
+-- 
+2.17.1
+

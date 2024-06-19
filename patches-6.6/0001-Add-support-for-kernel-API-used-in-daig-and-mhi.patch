@@ -1,0 +1,43 @@
+From f42b216dae96e4d98da87933a02adbe21d9d9a3b Mon Sep 17 00:00:00 2001
+From: Venkatesh Perumal <quic_venper@quicinc.com>
+Date: Wed, 17 Apr 2024 18:52:06 +0530
+Subject: [PATCH 1/4] Add support for upstream rmnet driver
+
+---
+ include/linux/netdevice.h | 1 +
+ net/core/dev.c            | 7 +++++++
+ 2 files changed, 8 insertions(+)
+
+diff --git a/include/linux/netdevice.h b/include/linux/netdevice.h
+index b646609f09c0..f9babace6f4a 100644
+--- a/include/linux/netdevice.h
++++ b/include/linux/netdevice.h
+@@ -5209,6 +5209,7 @@ extern struct list_head ptype_all __read_mostly;
+ extern struct list_head ptype_base[PTYPE_HASH_SIZE] __read_mostly;
+ 
+ extern struct net_device *blackhole_netdev;
++extern struct napi_struct *get_current_napi_context(void);
+ 
+ /* Note: Avoid these macros in fast path, prefer per-cpu or per-queue counters. */
+ #define DEV_STATS_INC(DEV, FIELD) atomic_long_inc(&(DEV)->stats.__##FIELD)
+diff --git a/net/core/dev.c b/net/core/dev.c
+index 9f3f8930c691..5b1299aecb13 100644
+--- a/net/core/dev.c
++++ b/net/core/dev.c
+@@ -6539,6 +6539,13 @@ void __netif_napi_del(struct napi_struct *napi)
+ }
+ EXPORT_SYMBOL(__netif_napi_del);
+ 
++struct napi_struct *get_current_napi_context(void)
++{
++	struct softnet_data *sd = this_cpu_ptr(&softnet_data);
++	return &(sd->backlog);
++}
++EXPORT_SYMBOL(get_current_napi_context);
++
+ static int __napi_poll(struct napi_struct *n, bool *repoll)
+ {
+ 	int work, weight;
+-- 
+2.17.1
+
