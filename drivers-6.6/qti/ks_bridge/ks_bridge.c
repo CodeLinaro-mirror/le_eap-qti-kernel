@@ -9,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
  */
 
 #include <linux/kernel.h>
@@ -741,7 +744,7 @@ ksb_usb_probe(struct usb_interface *ifc, const struct usb_device_id *id)
 		goto fail_chrdev_region;
 	}
 
-	ksb->class = class_create(THIS_MODULE, ksb->name);
+	ksb->class = class_create(ksb->name);
 	if (IS_ERR(ksb->class)) {
 		dbg_log_event(ksb, "clscr failed", PTR_ERR(ksb->class), 0);
 		ret = PTR_ERR(ksb->class);

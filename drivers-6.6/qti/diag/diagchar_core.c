@@ -9,6 +9,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
  */
 
 #include <linux/slab.h>
@@ -4276,7 +4279,7 @@ static int diagchar_setup_cdev(dev_t devno)
 		return err;
 	}
 
-	driver->diagchar_class = class_create(THIS_MODULE, "diag");
+	driver->diagchar_class = class_create("diag");
 
 	if (IS_ERR(driver->diagchar_class)) {
 		pr_err("Error creating diagchar class.\n");
