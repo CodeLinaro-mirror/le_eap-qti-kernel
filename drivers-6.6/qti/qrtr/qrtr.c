@@ -563,6 +563,7 @@ static int qrtr_node_enqueue(struct qrtr_node *node, struct sk_buff *skb,
 			     int type, struct sockaddr_qrtr *from,
 			     struct sockaddr_qrtr *to, unsigned int flags)
 {
+	struct qrtr_ctrl_pkt pkt = {0,};
 	struct qrtr_hdr_v1 *hdr;
 	int confirm_rx;
 	size_t len = skb->len;
@@ -603,6 +604,22 @@ static int qrtr_node_enqueue(struct qrtr_node *node, struct sk_buff *skb,
 	hdr->dst_port_id = cpu_to_le32(to->sq_port);
 	hdr->size = cpu_to_le32(len);
 	hdr->confirm_rx = !!confirm_rx;
+
+	if (type == QRTR_TYPE_NEW_SERVER) {
+		skb_copy_bits(skb, QRTR_HDR_MAX_SIZE, &pkt, sizeof(pkt));
+
+		/* run qrtr filter to drop the restricted new server message
+		 * that is being transmitted to connected soc
+		 */
+		rc = qrtr_run_bpf_filter(skb, le32_to_cpu(pkt.server.service),
+					 le32_to_cpu(pkt.server.instance),
+					 type, le32_to_cpu(hdr->dst_node_id));
+		if (rc) {
+			kfree_skb(skb);
+			return rc;
+		}
+	}
+
 	qrtr_log_tx_msg(node, hdr, skb);
 	rc = skb_put_padto(skb, ALIGN(len, 4) + sizeof(*hdr));
 	if (rc) {
@@ -970,14 +987,14 @@ static void qrtr_sock_queue_skb(struct qrtr_node *node, struct sk_buff *skb,
 			return;
 		}
 		atomic_inc(&node->hello_rcvd);
-	}	
+	}
 	rc = sock_queue_rcv_skb(&ipc->sk, skb);
 	if (rc) {
 		pr_err("%s: qrtr pkt dropped flow[%d] rc[%d]\n",
 				__func__, cb->confirm_rx, rc);
 		kfree_skb(skb);
 	}
-}	
+}
 /* Handle and route a received packet.
  *
  * This will auto-reply with resume-tx packet as necessary.
@@ -986,8 +1003,9 @@ static void qrtr_node_rx_work(struct kthread_work *work)
 {
 	struct qrtr_node *node = container_of(work, struct qrtr_node,
 					      read_data);
-	struct qrtr_ctrl_pkt *pkt;
+	struct qrtr_ctrl_pkt pkt = {0,};
 	struct sk_buff *skb;
+	int rc;
 
 	while ((skb = skb_dequeue(&node->rx_queue)) != NULL) {
 		struct qrtr_sock *ipc;
@@ -1000,9 +1018,22 @@ static void qrtr_node_rx_work(struct kthread_work *work)
 			qrtr_fwd_ctrl_pkt(skb);
 
 		if (cb->type == QRTR_TYPE_NEW_SERVER &&
-		    skb->len == sizeof(*pkt)) {
-			pkt = (void *)skb->data;
-			qrtr_node_assign(node, le32_to_cpu(pkt->server.node));
+		    skb->len == sizeof(pkt)) {
+			skb_copy_bits(skb, 0, &pkt, sizeof(pkt));
+			qrtr_node_assign(node, le32_to_cpu(pkt.server.node));
+			/**
+			 * Run qrtr filter to drop the restricted new server
+			 * message that is being transmitted to connected soc
+			 */
+			rc = qrtr_run_bpf_filter
+				(skb,
+				 le32_to_cpu(pkt.server.service),
+				 le32_to_cpu(pkt.server.instance),
+				 cb->type, cb->src_node);
+			if (rc) {
+				kfree_skb(skb);
+				continue;;
+			}
 		}
 
 		if (cb->type == QRTR_TYPE_RESUME_TX) {
@@ -1535,6 +1566,7 @@ static int qrtr_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 	struct qrtr_ctrl_pkt *pkt;
 	struct qrtr_node *node;
 	struct qrtr_node *srv_node;
+	struct service_info *info;
 	struct sk_buff *skb;
 	size_t plen;
 	u32 type = QRTR_TYPE_DATA;
@@ -1607,6 +1639,19 @@ static int qrtr_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 	if (rc) {
 		kfree_skb(skb);
 		goto out_node;
+	}
+
+	/* look up service information from service radix tree */
+	rc = qrtr_service_lookup(addr->sq_node, addr->sq_port, &info);
+	/* run bpf filter only if the sender is a valid qmi client */
+	if (!rc && ipc->us.sq_port != QRTR_PORT_CTRL) {
+		rc = qrtr_run_bpf_filter(skb, info->service_id,
+					 info->instance_id,
+					 type, 0);
+		if (rc) {
+			kfree_skb(skb);
+			goto out_node;
+		}
 	}
 
 	if (ipc->us.sq_port == QRTR_PORT_CTRL ||
