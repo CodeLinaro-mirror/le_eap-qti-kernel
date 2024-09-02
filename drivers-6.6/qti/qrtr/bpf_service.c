@@ -17,6 +17,7 @@
 #include "bpf_service.h"
 #include <linux/bpf.h>
 #include <linux/rcupdate.h>
+#include <linux/filter.h>
 #include "qrtr.h"
 
 /* qrtr filter (based on eBPF) related declarations */
