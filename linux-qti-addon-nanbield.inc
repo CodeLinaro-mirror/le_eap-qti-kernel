@@ -63,12 +63,10 @@ do_unpack_extra () {
 
 
     if [ -e ${S}/arch/arm64/boot/dts/freescale/fsl-imx8dx.dtsi ]; then
-        echo "#include \"sa525m-mhi.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/fsl-imx8dx.dtsi
-	echo "#include \"eap_diag.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/fsl-imx8dx.dtsi
+        echo "#include \"eap_diag.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/fsl-imx8dx.dtsi
     fi
 
     if [ -e ${S}/arch/arm64/boot/dts/freescale/imx8qxp.dtsi ]; then
-        echo "#include \"sa525m-mhi.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
         echo "#include \"eap_diag.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
     fi
 
