@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# MHI bus
+#
+# Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
+#
+# Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+#
+
+config QTI_MHI_BUS
+	tristate "Modem Host Interface (MHI) bus"
+	help
+	  Bus driver for MHI protocol. Modem Host Interface (MHI) is a
+	  communication protocol used by the host processors to control
+	  and communicate with modem devices over a high speed peripheral
+	  bus or shared memory. Enabling this module will allow host to
+	  communicate with external devices that support MHI protocol.
+
+config QTI_MHI_DEBUG
+	bool "Debugfs support for the MHI bus"
+	depends on QTI_MHI_BUS
+	help
+	  Enable debugfs support for use with the MHI transport. Allows
+	  reading and/or modifying some values within the MHI controller
+	  for debug and test purposes.
+
+config QTI_MHI_PCI_GENERIC
+	tristate "MHI PCI Generic controller driver"
+	depends on QTI_MHI_BUS
+	help
+	  This driver provides MHI PCI controller driver for devices such as
+	  Qualcomm SDX55 based PCIe modems. Say yes here to enable MHI PCIE
+	  related function in the MHI transport.
+

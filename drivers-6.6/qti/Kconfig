@@ -1,3 +1,4 @@
+source "drivers/qti/mhi/Kconfig"
 source "drivers/qti/qrtr/Kconfig"
 source "drivers/qti/usb_bridge/Kconfig"
 source "drivers/qti/diag/Kconfig"

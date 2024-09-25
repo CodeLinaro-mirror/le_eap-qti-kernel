@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# MHI bus
+#
+# Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+#
+
+source "drivers-6.6/qti/mhi/host/Kconfig"
+
