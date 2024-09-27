@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+#
+
+config QTI_MHI_NETDEV
+	tristate "MHI Net support for the MHI client"
+	depends on QTI_MHI_BUS
+	help
+	  This is a client for MHI Transport.
+	  The MHI-based network device driver facilitates IP traffic transfer
+	  between the host and modem. Enabling this driver allows clients
+	  to use a standard network interface for data transfer,
+	  with over-the-air traffic managed through the MHI netdev interface.

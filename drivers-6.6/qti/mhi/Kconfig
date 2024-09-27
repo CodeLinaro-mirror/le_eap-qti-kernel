@@ -6,4 +6,5 @@
 #
 
 source "drivers-6.6/qti/mhi/host/Kconfig"
+source "drivers-6.6/qti/mhi/devices/Kconfig"
 
