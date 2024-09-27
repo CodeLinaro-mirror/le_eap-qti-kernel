@@ -15,6 +15,7 @@
 #include <linux/spinlock.h>
 #include <linux/wait.h>
 #include <linux/workqueue.h>
+#include <linux/init.h>
 
 #define MHI_MAX_OEM_PK_HASH_SEGMENTS 16
 
@@ -46,6 +47,7 @@ enum mhi_callback {
 	MHI_CB_SYS_ERROR,
 	MHI_CB_FATAL_ERROR,
 	MHI_CB_BW_REQ,
+	MHI_CB_DTR_SIGNAL,
 };
 
 /**
@@ -475,6 +477,7 @@ struct mhi_device {
 	int ul_chan_id;
 	int dl_chan_id;
 	u32 dev_wake;
+	u32 tiocm;
 };
 
 /**
@@ -529,7 +532,7 @@ struct mhi_driver {
 	struct device_driver driver;
 };
 
-#define to_mhi_driver(drv) container_of_const(drv, struct mhi_driver, driver)
+#define to_mhi_driver(drv) container_of(drv, struct mhi_driver, driver)
 #define to_mhi_device(dev) container_of(dev, struct mhi_device, dev)
 
 /**
