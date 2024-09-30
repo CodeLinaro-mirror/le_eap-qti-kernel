@@ -3,22 +3,18 @@
  *
  * RMNET_CTL mhi handler
  *
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
 #include <linux/mod_devicetable.h>
 #include <linux/of.h>
 #include <linux/skbuff.h>
-#include <linux/mhi.h>
+#include <linux/mhi_generic.h>
 #include "rmnet_ctl.h"
 #include "rmnet_ctl_client.h"
 
 #define RMNET_CTL_DEFAULT_MRU 256
-
-extern int mhi_prepare_for_transfer(struct mhi_device *mhi_dev);
-extern void mhi_driver_unregister(struct mhi_driver *mhi_drv);
-extern int mhi_driver_register(struct mhi_driver *mhi_drv);
-extern int mhi_get_no_free_descriptors(struct mhi_device *mhi_dev, enum dma_data_direction dir);
 
 struct rmnet_ctl_mhi_dev {
 	struct mhi_device *mhi_dev;
@@ -37,7 +33,7 @@ static int rmnet_ctl_send_mhi(struct rmnet_ctl_dev *dev, struct sk_buff *skb)
 
 	spin_lock_bh(&ctl_dev->tx_lock);
 
-	rc = mhi_queue_transfer(ctl_dev->mhi_dev,
+	rc = mhi_queue_skb(ctl_dev->mhi_dev,
 				DMA_TO_DEVICE, skb, skb->len, MHI_EOT);
 	if (rc)
 		dev->stats.tx_err++;
@@ -56,7 +52,7 @@ static void rmnet_ctl_alloc_buffers(struct rmnet_ctl_mhi_dev *ctl_dev,
 	void *buf;
 	int no_tre, i, rc;
 
-	no_tre = mhi_get_no_free_descriptors(mhi_dev, DMA_FROM_DEVICE);
+	no_tre = mhi_get_free_desc_count(mhi_dev, DMA_FROM_DEVICE);
 
 	if (!no_tre && free_buf) {
 		kfree(free_buf);
@@ -75,7 +71,7 @@ static void rmnet_ctl_alloc_buffers(struct rmnet_ctl_mhi_dev *ctl_dev,
 			return;
 
 		spin_lock_bh(&ctl_dev->rx_lock);
-		rc = mhi_queue_transfer(mhi_dev, DMA_FROM_DEVICE,
+		rc = mhi_queue_buf(mhi_dev, DMA_FROM_DEVICE,
 					buf, ctl_dev->mru, MHI_EOT);
 		spin_unlock_bh(&ctl_dev->rx_lock);
 
@@ -128,7 +124,7 @@ static void rmnet_ctl_ul_callback(struct mhi_device *mhi_dev,
 }
 
 static void rmnet_ctl_status_callback(struct mhi_device *mhi_dev,
-				      enum MHI_CB mhi_cb)
+				      enum mhi_callback mhi_cb)
 {
 	struct rmnet_ctl_mhi_dev *ctl_dev = dev_get_drvdata(&mhi_dev->dev);
 
@@ -208,7 +204,7 @@ static int __init rmnet_ctl_init(void)
 {
 	int rc;
 
-	rc = mhi_driver_register(&rmnet_ctl_driver);
+	rc = __mhi_driver_register(&rmnet_ctl_driver, THIS_MODULE);
 	rmnet_ctl_set_dbgfs(true);
 
 	return rc;
