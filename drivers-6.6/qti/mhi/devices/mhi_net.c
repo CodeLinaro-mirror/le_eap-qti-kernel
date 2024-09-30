@@ -13,6 +13,7 @@
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <linux/u64_stats_sync.h>
+#include <linux/etherdevice.h>
 
 #define MHI_NET_MIN_MTU		ETH_MIN_MTU
 #define MHI_NET_MAX_MTU		0xffff
@@ -40,10 +41,12 @@ struct mhi_net_dev {
 	u32 rx_queue_sz;
 	int msg_enable;
 	unsigned int mru;
+	bool eth_iface_support;
 };
 
 struct mhi_device_info {
 	const char *netname;
+	bool eth_iface_support;
 };
 
 static int mhi_ndo_open(struct net_device *ndev)
@@ -142,6 +145,15 @@ static void mhi_net_setup(struct net_device *ndev)
 	ndev->tx_queue_len = 1000;
 }
 
+static void mhi_net_ether_setup(struct net_device *ndev)
+{
+	ndev->netdev_ops = &mhi_netdev_ops;
+	ether_setup(ndev);
+	ndev->mtu = MHI_NET_DEFAULT_MTU;
+	ndev->max_mtu = ETH_MAX_MTU;
+	ndev->min_mtu = ETH_MIN_MTU;
+}
+
 static struct sk_buff *mhi_net_skb_agg(struct mhi_net_dev *mhi_netdev,
 				       struct sk_buff *skb)
 {
@@ -211,18 +223,21 @@ static void mhi_net_dl_callback(struct mhi_device *mhi_dev,
 			mhi_netdev->skbagg_head = NULL;
 		}
 
-		switch (skb->data[0] & 0xf0) {
-		case 0x40:
-			skb->protocol = htons(ETH_P_IP);
-			break;
-		case 0x60:
-			skb->protocol = htons(ETH_P_IPV6);
-			break;
-		default:
-			skb->protocol = htons(ETH_P_MAP);
-			break;
+		if (mhi_netdev->eth_iface_support)
+			skb->protocol = eth_type_trans(skb, mhi_netdev->ndev);
+		else {
+			switch (skb->data[0] & 0xf0) {
+			case 0x40:
+				skb->protocol = htons(ETH_P_IP);
+				break;
+			case 0x60:
+				skb->protocol = htons(ETH_P_IPV6);
+				break;
+			default:
+				skb->protocol = htons(ETH_P_MAP);
+				break;
+			}
 		}
-
 		u64_stats_update_begin(&mhi_netdev->stats.rx_syncp);
 		u64_stats_inc(&mhi_netdev->stats.rx_packets);
 		u64_stats_add(&mhi_netdev->stats.rx_bytes, skb->len);
@@ -277,7 +292,7 @@ static void mhi_net_rx_refill_work(struct work_struct *work)
 	unsigned int size;
 	int err;
 
-	size = mhi_netdev->mru ? mhi_netdev->mru : READ_ONCE(ndev->mtu);
+	size = mdev->mhi_cntrl->buffer_len;
 
 	while (!mhi_queue_is_full(mdev, DMA_FROM_DEVICE)) {
 		skb = netdev_alloc_skb(ndev, size);
@@ -350,6 +365,24 @@ static void mhi_net_dellink(struct mhi_device *mhi_dev, struct net_device *ndev)
 	dev_set_drvdata(&mhi_dev->dev, NULL);
 }
 
+static int mhi_net_eth_iface_support(struct mhi_device *mhi_dev, struct net_device *ndev)
+{
+	struct mhi_net_dev *mhi_netdev;
+
+	mhi_netdev = netdev_priv(ndev);
+	dev_set_drvdata(&mhi_dev->dev, mhi_netdev);
+
+	mhi_netdev->eth_iface_support = true;
+
+	eth_random_addr(ndev->dev_addr);
+	if (!is_valid_ether_addr(ndev->dev_addr))
+		return -EADDRNOTAVAIL;
+
+	memcpy(ndev->dev_addr_shadow, ndev->dev_addr, MAX_ADDR_LEN);
+
+	return 0;
+}
+
 static int mhi_net_probe(struct mhi_device *mhi_dev,
 			 const struct mhi_device_id *id)
 {
@@ -357,12 +390,20 @@ static int mhi_net_probe(struct mhi_device *mhi_dev,
 	struct net_device *ndev;
 	int err;
 
-	ndev = alloc_netdev(sizeof(struct mhi_net_dev), info->netname,
-			    NET_NAME_PREDICTABLE, mhi_net_setup);
+	ndev = alloc_netdev(sizeof(struct mhi_net_dev), info->netname, NET_NAME_PREDICTABLE,
+			(info->eth_iface_support ? mhi_net_ether_setup: mhi_net_setup));
 	if (!ndev)
 		return -ENOMEM;
 
 	SET_NETDEV_DEV(ndev, &mhi_dev->dev);
+
+	if (info->eth_iface_support) {
+		err = mhi_net_eth_iface_support(mhi_dev, ndev);
+		if (err) {
+			free_netdev(ndev);
+			return err;
+		}
+	}
 
 	err = mhi_net_newlink(mhi_dev, ndev);
 	if (err) {
@@ -381,10 +422,12 @@ static void mhi_net_remove(struct mhi_device *mhi_dev)
 }
 
 static const struct mhi_device_info mhi_hwip0 = {
-	.netname = "mhi_hwip%d",
+	.eth_iface_support = true,
+	.netname = "mhi_eth%d",
 };
 
 static const struct mhi_device_info mhi_swip0 = {
+	.eth_iface_support = true,
 	.netname = "mhi_swip%d",
 };
 
