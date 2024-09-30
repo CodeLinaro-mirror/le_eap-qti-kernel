@@ -8,6 +8,8 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -22,7 +24,7 @@
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
 #include <linux/dma-direction.h>
-#include <linux/mhi.h>
+#include <linux/mhi_generic.h>
 #include <linux/delay.h>
 #include <linux/vmalloc.h>
 #include <asm/current.h>
@@ -422,7 +424,7 @@ static void mhi_read_work_fn(struct work_struct *work)
 {
 	int err = 0;
 	unsigned char *buf = NULL;
-	enum MHI_FLAGS mhi_flags = MHI_EOT;
+	enum mhi_flags mhi_flag = MHI_EOT;
 	struct diag_mhi_ch_t *read_ch = NULL;
 	unsigned long flags;
 	struct diag_mhi_info *mhi_info = container_of(work,
@@ -458,8 +460,9 @@ static void mhi_read_work_fn(struct work_struct *work)
 			 "queueing a read buf %pK, ch: %s\n",
 			 buf, mhi_info->name);
 
-		err = mhi_queue_transfer(mhi_info->mhi_dev, DMA_FROM_DEVICE,
-					buf, DIAG_MDM_BUF_SIZE, mhi_flags);
+		err = mhi_queue_buf(mhi_info->mhi_dev, DMA_FROM_DEVICE,
+					buf, DIAG_MDM_BUF_SIZE, mhi_flag);
+
 		spin_unlock_irqrestore(&read_ch->lock, flags);
 		if (err) {
 			pr_err_ratelimited("diag: Unable to read from MHI channel %s, err: %d\n",
@@ -490,7 +493,7 @@ static int mhi_queue_read(int id)
 static int mhi_write(int id, unsigned char *buf, int len, int ctxt)
 {
 	int err = 0;
-	enum MHI_FLAGS mhi_flags = MHI_EOT;
+	enum mhi_flags mhi_flag = MHI_EOT;
 	unsigned long flags;
 	struct diag_mhi_ch_t *ch = NULL;
 
@@ -525,8 +528,9 @@ static int mhi_write(int id, unsigned char *buf, int len, int ctxt)
 	if (err)
 		goto fail;
 
-	err = mhi_queue_transfer(diag_mhi[id].mhi_dev, DMA_TO_DEVICE, buf,
-				len, mhi_flags);
+	err = mhi_queue_buf(diag_mhi[id].mhi_dev, DMA_TO_DEVICE, buf,
+				len, mhi_flag);
+
 	spin_unlock_irqrestore(&ch->lock, flags);
 	if (err) {
 		DIAG_LOG(DIAG_DEBUG_MHI,

@@ -34,7 +34,7 @@
 #ifdef CONFIG_IPC_LOGGING
 #include <linux/ipc_logging.h>
 #endif
-#include <linux/mhi.h>
+#include <linux/mhi_generic.h>
 
 #define MHI_1			0
 #define MHI_DCI_1		1
