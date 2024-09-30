@@ -8,12 +8,14 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
 #include <linux/skbuff.h>
 #include <linux/mod_devicetable.h>
-#include <linux/mhi.h>
+#include <linux/mhi_generic.h>
 #include <net/sock.h>
 #include <linux/of.h>
 
@@ -25,6 +27,7 @@ struct qrtr_mhi_dev {
 	struct device *dev;
 	spinlock_t ul_lock;		/* lock to protect ul_pkts */
 	struct list_head ul_pkts;
+	struct completion prepared;
 };
 
 struct qrtr_mhi_pkt {
@@ -84,6 +87,13 @@ static int qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
 	struct qrtr_mhi_pkt *pkt;
 	int rc;
 
+	rc = wait_for_completion_interruptible(&qdev->prepared);
+	if (rc) {
+		if (skb->sk)
+			sock_put(skb->sk);
+		kfree_skb(skb);
+	}
+
 	rc = skb_linearize(skb);
 	if (rc) {
 		kfree_skb(skb);
@@ -102,8 +112,8 @@ static int qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
 	pkt->skb = skb;
 	spin_lock_bh(&qdev->ul_lock);
 	list_add_tail(&pkt->node, &qdev->ul_pkts);
-	rc = mhi_queue_transfer(qdev->mhi_dev, DMA_TO_DEVICE, skb, skb->len,
-				MHI_EOT);
+	rc = mhi_queue_skb(qdev->mhi_dev, DMA_TO_DEVICE, skb, skb->len,
+						MHI_EOT);
 	if (rc) {
 		list_del(&pkt->node);
 		kfree_skb(skb);
@@ -139,6 +149,7 @@ static int qcom_mhi_qrtr_probe(struct mhi_device *mhi_dev,
 	qdev->mhi_dev = mhi_dev;
 	qdev->dev = &mhi_dev->dev;
 	qdev->ep.xmit = qcom_mhi_qrtr_send;
+	init_completion(&qdev->prepared);
 
 	rc = of_property_read_u32(mhi_dev->dev.of_node, "qcom,net-id", &net_id);
 	if (rc < 0)
@@ -149,12 +160,19 @@ static int qcom_mhi_qrtr_probe(struct mhi_device *mhi_dev,
 	INIT_LIST_HEAD(&qdev->ul_pkts);
 	spin_lock_init(&qdev->ul_lock);
 
+	dev_set_drvdata(&mhi_dev->dev, qdev);
+
 	rc = qrtr_endpoint_register(&qdev->ep, net_id, rt);
 	if (rc)
 		return rc;
 
-	dev_set_drvdata(&mhi_dev->dev, qdev);
-
+	rc = mhi_prepare_for_transfer_autoqueue(mhi_dev);
+	if (rc) {
+		qrtr_endpoint_unregister(&qdev->ep);
+		dev_set_drvdata(&mhi_dev->dev, NULL);
+		return rc;
+	}
+	complete_all(&qdev->prepared);
 	dev_dbg(qdev->dev, "QTI MHI QRTR driver probed\n");
 	return 0;
 }
