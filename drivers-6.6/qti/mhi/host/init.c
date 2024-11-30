@@ -21,9 +21,6 @@
 #include <linux/wait.h>
 #include "internal.h"
 
-#define CREATE_TRACE_POINTS
-#include "trace.h"
-
 static DEFINE_IDA(mhi_controller_ida);
 
 #undef mhi_ee
