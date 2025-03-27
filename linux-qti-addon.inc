@@ -64,6 +64,14 @@ do_unpack_extra () {
         echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/fsl-imx8dx.dtsi
     fi
 
+    if [ -e ${S}/arch/arm64/boot/dts/freescale/fsl-imx8qxp.dtsi ]; then
+        echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/fsl-imx8qxp.dtsi
+    fi
+
+    if [ -e ${S}/arch/arm64/boot/dts/freescale/fsl-imx8qxp-mek.dtsi ]; then
+        echo "#include \"external-modem-pcie.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/fsl-imx8qxp-mek.dtsi
+    fi
+
     if [ "${@d.getVar('LINUX_VERSION')[0:3]}" = "4.9" ]; then
         cd ${S}
         git apply ${WORKDIR}/eap-qti-kernel/patches-4.9/0001-mhi_bus-core-Add-support-for-MHI-host-interface.patch
