@@ -35,7 +35,7 @@ DECLARE_EVENT_CLASS(rmnet_skb_time_template,
 		__entry->skbaddr = skb;
 		__entry->len = skb->len;
 		__assign_str(name, skb->dev->name);
-		__entry->qtime = ktime_get_tai_ns();
+		__entry->qtime = ktime_get_clocktai_ns();
 	),
 
 	TP_printk("dev=%s skbaddr=%pK len=%u UTC time %ld",
