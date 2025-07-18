@@ -28,6 +28,7 @@
 #include "diagfwd_peripheral.h"
 #include "diagfwd_rpmsg.h"
 #include "diag_ipc_logging.h"
+#include <linux/string.h>
 
 #define PERI_RPMSG rpmsg_info->peripheral
 
@@ -693,7 +694,7 @@ static void __diag_rpmsg_init(struct diag_rpmsg_info *rpmsg_info)
 	init_waitqueue_head(&rpmsg_info->wait_q);
 	init_waitqueue_head(&rpmsg_info->read_wait_q);
 	mutex_init(&rpmsg_info->lock);
-	strlcpy(wq_name, "DIAG_RPMSG_", sizeof(wq_name));
+	strscpy(wq_name, "DIAG_RPMSG_", sizeof(wq_name));
 	strlcat(wq_name, rpmsg_info->name, sizeof(wq_name));
 	rpmsg_info->wq = create_singlethread_workqueue(wq_name);
 	if (!rpmsg_info->wq) {

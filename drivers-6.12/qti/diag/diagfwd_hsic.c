@@ -370,22 +370,27 @@ static int diag_hsic_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int diag_hsic_remove(struct platform_device *pdev)
+static void diag_hsic_remove(struct platform_device *pdev)
 {
 	struct diag_hsic_info *ch = NULL;
 
 	if (!pdev)
-		return -EIO;
-
-	pr_debug("diag: hsic close pdev: %d\n", pdev->id);
-	if (pdev->id >= NUM_HSIC_DEV) {
-		pr_err("diag: No support for HSIC device %d\n", pdev->id);
-		return -EIO;
+	{
+		pr_err("diag: pdev invalid");
+		//return -EIO;
 	}
+	else
+	{
+		pr_debug("diag: hsic close pdev: %d\n", pdev->id);
+		if (pdev->id >= NUM_HSIC_DEV) {
+			pr_err("diag: No support for HSIC device %d\n", pdev->id);
+			//return -EIO;
+		}
 
-	ch = &diag_hsic[pdev->id];
-	queue_work(ch->hsic_wq, &(ch->close_work));
-	return 0;
+		ch = &diag_hsic[pdev->id];
+		queue_work(ch->hsic_wq, &(ch->close_work));
+	}
+	//return 0;
 }
 
 static int diagfwd_hsic_runtime_suspend(struct device *dev)
@@ -500,7 +505,7 @@ int diag_hsic_init(void)
 			  hsic_read_complete_work_fn);
 		INIT_WORK(&(ch->open_work), hsic_open_work_fn);
 		INIT_WORK(&(ch->close_work), hsic_close_work_fn);
-		strlcpy(wq_name, "DIAG_HSIC_", sizeof(wq_name));
+		strscpy(wq_name, "DIAG_HSIC_", sizeof(wq_name));
 		strlcat(wq_name, ch->name, sizeof(wq_name));
 		ch->hsic_wq = create_singlethread_workqueue(wq_name);
 		if (!ch->hsic_wq)

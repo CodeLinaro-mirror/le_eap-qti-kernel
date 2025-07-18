@@ -746,7 +746,7 @@ int diag_mhi_init(void)
 		INIT_WORK(&(mhi_info->read_done_work), mhi_read_done_work_fn);
 		INIT_WORK(&(mhi_info->open_work), mhi_open_work_fn);
 		INIT_WORK(&(mhi_info->close_work), mhi_close_work_fn);
-		strlcpy(wq_name, "diag_mhi_", sizeof(wq_name));
+		strscpy(wq_name, "diag_mhi_", sizeof(wq_name));
 		strlcat(wq_name, mhi_info->name, sizeof(wq_name));
 		diagmem_init(driver, mhi_info->mempool);
 		mhi_info->mempool_init = 1;

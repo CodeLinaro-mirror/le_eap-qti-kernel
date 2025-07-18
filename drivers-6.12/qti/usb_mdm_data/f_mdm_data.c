@@ -1502,7 +1502,7 @@ fail:
 }
 
 /* mdm disconnect */
-static int mdm_data_remove(struct platform_device *pdev)
+static void mdm_data_remove(struct platform_device *pdev)
 {
 	struct mdm_data_port *port;
 	int id;
@@ -1512,7 +1512,7 @@ static int mdm_data_remove(struct platform_device *pdev)
 	id = bridge_name_to_id(pdev->name);
 	if (id < 0) {
 		pr_err("%s: invalid port\n", __func__);
-		return -EINVAL;
+		//return -EINVAL;
 	}
 
 	port = mdm_data_ports[id];
@@ -1530,7 +1530,7 @@ static int mdm_data_remove(struct platform_device *pdev)
 
 	mdm_ctrl_remove(id);
 
-	return 0;
+	//return 0;
 }
 
 static void mdm_ctrl_port_deinit(struct mdm_ctrl_port *port)
@@ -1551,7 +1551,7 @@ static void mdm_data_port_deinit(struct mdm_data_port *port)
 static int
 mdm_ctrl_port_init(struct mdm_ctrl_port *port, const char *port_name, int id)
 {
-	strlcpy(port->port_name, port_name, MAX_INST_NAME_LEN);
+	strscpy(port->port_name, port_name, MAX_INST_NAME_LEN);
 
 	port->wq = create_singlethread_workqueue(port->port_name);
 	if (!port->wq) {
@@ -1580,7 +1580,7 @@ static int mdm_data_port_init(struct mdm_data_port *port, const char *port_name)
 {
 	struct platform_driver	*pdrv;
 
-	strlcpy(port->port_name, port_name, MAX_INST_NAME_LEN);
+	strscpy(port->port_name, port_name, MAX_INST_NAME_LEN);
 
 	port->wq = create_singlethread_workqueue(port->port_name);
 	if (!port->wq) {
