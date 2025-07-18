@@ -1,0 +1,48 @@
+From 9188209d1064dbbea7a5950a2d747db3ce2262ff Mon Sep 17 00:00:00 2001
+From: venper <venper@qti.qualcomm.com>
+Date: Wed, 29 Oct 2025 12:57:28 +0530
+Subject: [PATCH] Add support for upstream rmnet driver
+
+eap-qti-kernel 6.12 Driver Patch Updates:
+The rmnet driver now includes support for kernel_sock_ioctl from the upstream kernel.
+
+Signed-off-by: venper <venper@qti.qualcomm.com>
+---
+ include/linux/net.h |  1 +
+ net/socket.c        | 11 +++++++++++
+ 2 files changed, 12 insertions(+)
+
+diff --git a/include/linux/net.h b/include/linux/net.h
+index b75bc534c1b3..394b9419488f 100644
+--- a/include/linux/net.h
++++ b/include/linux/net.h
+@@ -359,6 +359,7 @@ int kernel_sock_shutdown(struct socket *sock, enum sock_shutdown_cmd how);
+ 
+ /* Routine returns the IP overhead imposed by a (caller-protected) socket. */
+ u32 kernel_sock_ip_overhead(struct sock *sk);
++int kernel_sock_ioctl(struct socket *sock, int cmd, unsigned long arg);
+ 
+ #define MODULE_ALIAS_NETPROTO(proto) \
+ 	MODULE_ALIAS("net-pf-" __stringify(proto))
+diff --git a/net/socket.c b/net/socket.c
+index 042451f01c65..fadc60f78c69 100644
+--- a/net/socket.c
++++ b/net/socket.c
+@@ -3746,3 +3746,14 @@ u32 kernel_sock_ip_overhead(struct sock *sk)
+ 	}
+ }
+ EXPORT_SYMBOL(kernel_sock_ip_overhead);
++
++int kernel_sock_ioctl(struct socket *sock, int cmd, unsigned long arg)
++{
++        int err;
++
++        err = sock->ops->ioctl(sock, cmd, arg);
++
++        return err;
++}
++EXPORT_SYMBOL(kernel_sock_ioctl);
++
+-- 
+2.17.1
+
