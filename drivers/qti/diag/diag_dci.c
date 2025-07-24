@@ -2116,8 +2116,11 @@ static int diag_process_dci_pkt_rsp(unsigned char *buf, int len)
 	if (temp_entry) {
 		reg_item = container_of(temp_entry, struct diag_cmd_reg_t,
 								entry);
-		ret = diag_send_dci_pkt(reg_item, req_buf, req_len,
+		mutex_lock(&driver->dci_mutex);
+		if (req_entry)
+			ret = diag_send_dci_pkt(reg_item, req_buf, req_len,
 					req_entry->tag);
+		mutex_unlock(&driver->dci_mutex);
 	} else {
 		DIAG_LOG(DIAG_DEBUG_DCI, "Command not found: %02x %02x %02x\n",
 				reg_entry.cmd_code, reg_entry.subsys_id,
