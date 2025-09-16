@@ -298,6 +298,8 @@ static const struct mhi_channel_config modem_qcom_sa525m_mhi_channels[] = {
 
 	MHI_CHANNEL_CONFIG_HW_UL(100, "IP_HW0", 512, 6),
 	MHI_CHANNEL_CONFIG_HW_DL(101, "IP_HW0", 512, 7),
+
+	MHI_CHANNEL_CONFIG_HW_DL(103, "IP_HW_QDSS", 512, 8),
 };
 
 static struct mhi_event_config modem_qcom_sa525m_mhi_events[] = {
@@ -317,7 +319,9 @@ static struct mhi_event_config modem_qcom_sa525m_mhi_events[] = {
 
 	/* Hardware channels request dedicated hardware event rings */
 	MHI_EVENT_CONFIG_HW_DATA(6, 512, 100),
-	MHI_EVENT_CONFIG_HW_DATA(7, 512, 101)
+	MHI_EVENT_CONFIG_HW_DATA(7, 512, 101),
+
+	MHI_EVENT_CONFIG_HW_DATA(8, 512, 103)
 };
 
 static const struct mhi_controller_config modem_qcom_v2_mhiv_config = {
