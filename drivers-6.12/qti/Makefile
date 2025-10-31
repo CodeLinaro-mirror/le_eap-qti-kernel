@@ -11,3 +11,4 @@ obj-$(CONFIG_QTI_USB_MDM_DATA_BRIDGE)  += usb_mdm_data/
 obj-$(CONFIG_QTI_QMI_RMNET)	+= dfc/
 obj-$(CONFIG_QTI_RMNET_CTL)	+= rmnet_ctl/
 obj-$(CONFIG_QTI_PCIE_SSR)	+= pcie_ssr/
+obj-y                           += side_band/

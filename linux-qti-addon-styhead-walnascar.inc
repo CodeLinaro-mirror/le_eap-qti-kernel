@@ -68,6 +68,7 @@ do_unpack_extra () {
 
     if [ -e ${S}/arch/arm64/boot/dts/freescale/imx95.dtsi ]; then
         echo "#include \"eap_diag.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/imx95.dtsi
+        echo "#include \"eap-sdx-ext-ipc-imx95-19x19.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/imx95.dtsi
     fi
 
     if [ "${@d.getVar('LINUX_VERSION')[0:4]}" = "6.12" ]; then
