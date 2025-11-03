@@ -298,7 +298,7 @@ static int setup_ipc(struct gpio_cntrl *mdm)
 
 		irq = gpiod_to_irq(mdm->gpdesc[STATUS_IN]);
 		if (irq < 0) {
-			dev_err(mdm->dev, "bad STATUS_IN IRQ resource\n");
+			dev_err(mdm->dev, "bad STATUS_IN IRQ resource %d (%pe)\n", irq, ERR_PTR(irq));
 			return irq;
 		}
 		mdm->status_irq = irq;
@@ -320,7 +320,7 @@ static int setup_ipc(struct gpio_cntrl *mdm)
 
 		irq = gpiod_to_irq(mdm->gpdesc[WAKEUP_IN]);
 		if (irq < 0) {
-			dev_err(mdm->dev, "bad WAKEUP_IN IRQ resource\n");
+			dev_err(mdm->dev, "bad WAKEUP_IN IRQ resource %d (%pe)\n", irq, ERR_PTR(irq));
 			return irq;
 		}
 		mdm->wakeup_irq = irq;
@@ -337,7 +337,7 @@ static int setup_ipc(struct gpio_cntrl *mdm)
 
 		irq = gpiod_to_irq(mdm->gpdesc[ERRFATAL_IN]);
 		if (irq < 0) {
-			dev_err(mdm->dev, "bad ERRFATAL_IN IRQ resource\n");
+			dev_err(mdm->dev, "bad ERRFATAL_IN IRQ resource %d (%pe)\n", irq, ERR_PTR(irq));
 			return irq;
 		}
 		mdm->err_irq = irq;
@@ -606,7 +606,7 @@ static int sdx_ext_ipc_probe(struct platform_device *pdev)
 	mdm->dev = &pdev->dev;
 	ret = setup_ipc(mdm);
 	if (ret) {
-		dev_err(mdm->dev, "Error setting up gpios\n");
+		dev_err(mdm->dev, "Error setting up gpios %d (%pe)\n", ret, ERR_PTR(ret));
 		return ret;
 	}
 
@@ -676,7 +676,7 @@ static int sdx_ext_ipc_probe(struct platform_device *pdev)
 		cdev_init(&mdm->sb_cdev, &sb_fileops);
 		cdev_add(&mdm->sb_cdev, mdm->sb_cdev_devid, 1);
 
-		mdm->sb_class = class_create(THIS_MODULE, "rmt_sys_evt");
+		mdm->sb_class = class_create("rmt_sys_evt");
 		if (IS_ERR(mdm->sb_class)) {
 			dev_err(mdm->dev,
 				"can't create rmt_sys_evt class, %d\n",
@@ -738,6 +738,7 @@ static int sdx_ext_ipc_probe(struct platform_device *pdev)
 			dev_err(mdm->dev,
 				"%s: ERRFATAL_IN IRQ#%d request failed,\n",
 				__func__, mdm->err_irq);
+			kfifo_free(&mdm->err_in_fifo);
 			goto irq_fail;
 		}
 
@@ -752,7 +753,7 @@ static int sdx_ext_ipc_probe(struct platform_device *pdev)
 		cdev_init(&mdm->sb_err_cdev, &sb_err_fileops);
 		cdev_add(&mdm->sb_err_cdev, mdm->sb_err_cdev_devid, 1);
 
-		mdm->sb_err_class = class_create(THIS_MODULE, "rmt_err_sys_evt");
+		mdm->sb_err_class = class_create("rmt_err_sys_evt");
 		if (IS_ERR(mdm->sb_err_class)) {
 			dev_err(mdm->dev,
 				"can't create rmt_err_sys_evt class, %d\n",
@@ -818,7 +819,7 @@ sys_fail2:
 	return ret;
 }
 
-static int sdx_ext_ipc_remove(struct platform_device *pdev)
+void sdx_ext_ipc_remove(struct platform_device *pdev)
 {
 	struct gpio_cntrl *mdm;
 
@@ -849,8 +850,6 @@ static int sdx_ext_ipc_remove(struct platform_device *pdev)
 	device_remove_file(mdm->dev, &dev_attr_policy);
 	mutex_destroy(&mdm->policy_lock);
 	mutex_destroy(&mdm->wakeup_out_lock);
-
-	return 0;
 }
 
 #ifdef CONFIG_PM
@@ -908,7 +907,16 @@ static struct platform_driver sdx_ext_ipc_driver = {
 
 static int __init sdx_ext_ipc_register(void)
 {
-	return platform_driver_register(&sdx_ext_ipc_driver);
+	int ret;
+
+	ret = platform_driver_register(&sdx_ext_ipc_driver);
+        if (ret) {
+            pr_err("Failed to register sdx_ext_ipc_driver: %d (%pe)\n", ret,ERR_PTR(ret));
+            return ret;
+        }
+        pr_info(" %s %d registered successfully\n",__func__,__LINE__);
+
+	return 0;
 }
 subsys_initcall(sdx_ext_ipc_register);
 

@@ -1,0 +1,49 @@
+From 45d286ed6532aa08b57588465c9e88e55f0ecdc6 Mon Sep 17 00:00:00 2001
+From: venper <venper@qti.qualcomm.com>
+Date: Wed, 29 Oct 2025 12:31:26 +0530
+Subject: [PATCH] Add support for kernel API used in diag and mhi
+
+eap-qti-kernel 6.12 Driver Patch Updates:
+The get_current_napi_context API has been updated in the netdev module.
+This will be utilized by both the Diag and MHI modules.
+File changes and configuration support have been added to align with kernel 6.12.
+
+Signed-off-by: venper <venper@qti.qualcomm.com>
+---
+ include/linux/netdevice.h | 1 +
+ net/core/dev.c            | 7 +++++++
+ 2 files changed, 8 insertions(+)
+
+diff --git a/include/linux/netdevice.h b/include/linux/netdevice.h
+index 8896705ccd63..afdaefec7f3f 100644
+--- a/include/linux/netdevice.h
++++ b/include/linux/netdevice.h
+@@ -88,6 +88,7 @@ void synchronize_net(void);
+ void netdev_set_default_ethtool_ops(struct net_device *dev,
+ 				    const struct ethtool_ops *ops);
+ void netdev_sw_irq_coalesce_default_on(struct net_device *dev);
++extern struct napi_struct *get_current_napi_context(void);
+ 
+ /* Backlog congestion levels */
+ #define NET_RX_SUCCESS		0	/* keep 'em coming, baby */
+diff --git a/net/core/dev.c b/net/core/dev.c
+index 8453e14d301b..c2ef4e0f8be9 100644
+--- a/net/core/dev.c
++++ b/net/core/dev.c
+@@ -6762,6 +6762,13 @@ void __netif_napi_del(struct napi_struct *napi)
+ }
+ EXPORT_SYMBOL(__netif_napi_del);
+ 
++struct napi_struct *get_current_napi_context(void)
++{
++	struct softnet_data *sd = this_cpu_ptr(&softnet_data);
++	return &(sd->backlog);
++}
++EXPORT_SYMBOL(get_current_napi_context);
++
+ static int __napi_poll(struct napi_struct *n, bool *repoll)
+ {
+ 	int work, weight;
+-- 
+2.17.1
+
