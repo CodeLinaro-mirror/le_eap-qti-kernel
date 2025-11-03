@@ -366,7 +366,7 @@ void rmnet_frag_deaggregate(skb_frag_t *frag, struct rmnet_port *port,
 			return;
 
 		rmnet_descriptor_add_frag(port, list, skb_frag_page(frag),
-					  frag->bv_offset + offset,
+					  frag->offset + offset,
 					  packet_len);
 
 		offset += packet_len;
@@ -490,7 +490,7 @@ static struct sk_buff *rmnet_alloc_skb(struct rmnet_frag_descriptor *frag_desc,
 	/* Add main fragment */
 	get_page(skb_frag_page(&frag_desc->frag));
 	skb_add_rx_frag(head_skb, 0, skb_frag_page(&frag_desc->frag),
-			frag_desc->frag.bv_offset,
+			frag_desc->frag.offset,
 			skb_frag_size(&frag_desc->frag),
 			skb_frag_size(&frag_desc->frag));
 
@@ -509,7 +509,7 @@ add_frag:
 		if (shinfo->nr_frags < MAX_SKB_FRAGS) {
 			get_page(skb_frag_page(frag));
 			skb_add_rx_frag(current_skb, shinfo->nr_frags,
-					skb_frag_page(frag), frag->bv_offset,
+					skb_frag_page(frag), frag->offset,
 					frag_size, frag_size);
 			if (current_skb != head_skb) {
 				head_skb->len += frag_size;
@@ -661,7 +661,7 @@ static void __rmnet_frag_segment_data(struct rmnet_frag_descriptor *coal_desc,
 		return;
 
 	/* Account for header lengths to access the data start */
-	offset = coal_desc->frag.bv_offset + coal_desc->ip_len +
+	offset = coal_desc->frag.offset + coal_desc->ip_len +
 		 coal_desc->trans_len + coal_desc->data_offset;
 
 	/* Header information and most metadata is the same as the original */

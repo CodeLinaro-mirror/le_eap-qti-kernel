@@ -392,7 +392,7 @@ struct sk_buff *rmnet_map_deaggregate(struct sk_buff *skb,
 	if (skb_is_nonlinear(skb)) {
 		skb_frag_t *frag0 = skb_shinfo(skb)->frags;
 		struct page *page = skb_frag_page(frag0);
-                size_t frag_limit = READ_ONCE(sysctl_max_skb_frags);
+                size_t frag_limit = MAX_SKB_FRAGS;;
                 ssize_t space;
                 space = frag_limit - skb_shinfo(skb)->nr_frags;
                 if (space < 0)
@@ -403,7 +403,7 @@ struct sk_buff *rmnet_map_deaggregate(struct sk_buff *skb,
 		if (!skbn)
 			return NULL;
 
-                skb_append_pagefrags(skbn, page, frag0->bv_offset,
+                skb_append_pagefrags(skbn, page, frag0->offset,
                                      packet_len, frag_limit);
 		skbn->data_len += packet_len;
 		skbn->len += packet_len;
@@ -664,7 +664,7 @@ static void rmnet_map_nonlinear_copy(struct sk_buff *coal_skb,
 	if (skb_is_nonlinear(coal_skb)) {
 		skb_frag_t *frag0 = skb_shinfo(coal_skb)->frags;
 		struct page *page = skb_frag_page(frag0);
-                size_t frag_limit = READ_ONCE(sysctl_max_skb_frags);
+                size_t frag_limit = MAX_SKB_FRAGS;
                 ssize_t space;
                 space = frag_limit - skb_shinfo(coal_skb)->nr_frags;
                 if (space < 0)
@@ -673,7 +673,7 @@ static void rmnet_map_nonlinear_copy(struct sk_buff *coal_skb,
 		}
 
 		skb_append_pagefrags(dest, page,
-				     frag0->bv_offset + coal_meta->ip_len +
+				     frag0->offset + coal_meta->ip_len +
 				     coal_meta->trans_len +
 				     coal_meta->data_offset,
 				     copy_len,frag_limit);

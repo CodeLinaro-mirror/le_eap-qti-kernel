@@ -179,9 +179,9 @@ static int ssr_probe(struct platform_device *pdev) {
 	return 0;
 }
 
-static int ssr_remove(struct platform_device *pdev) {
+static void ssr_remove(struct platform_device *pdev) {
 	pr_notice("SSR_debug:PCIe SSR Driver Remove Called");
-	return 0;
+	//return 0;
 }
 
 static const struct of_device_id mymatch[] = {

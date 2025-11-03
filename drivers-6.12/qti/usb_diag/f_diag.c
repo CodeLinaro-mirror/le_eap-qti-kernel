@@ -29,6 +29,7 @@
 #include <linux/debugfs.h>
 #include <linux/kmemleak.h>
 #include <linux/version.h>
+#include <linux/string.h>
 
 #define MAX_INST_NAME_LEN	40
 
@@ -285,7 +286,7 @@ static void diag_update_pid_and_serial_num(struct diag_context *ctxt)
 
 		for (s = (*table)->strings; s && s->s; s++) {
 			if (s->id == cdev->desc.iSerialNumber) {
-				strlcpy(local_diag_dload.serial_number, s->s,
+				strscpy(local_diag_dload.serial_number, s->s,
 					SERIAL_NUMBER_LENGTH);
 				goto update_dload;
 			}

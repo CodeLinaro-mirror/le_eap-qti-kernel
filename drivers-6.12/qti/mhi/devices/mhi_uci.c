@@ -17,6 +17,8 @@
 #include <linux/uaccess.h>
 #include <linux/mhi_generic.h>
 #include <linux/device/class.h>
+#include <linux/mhi.h>
+#include <linux/mod_devicetable.h>
 
 #define MAX_UCI_DEVICES		(64)
 
@@ -591,6 +593,7 @@ static const struct mhi_device_id mhi_uci_match_table[] = {
 	{ .chan = "FIREHOSE", .driver_data = 0x1000 },
 	{},
 };
+MODULE_DEVICE_TABLE(mhi, mhi_uci_match_table);
 
 static struct mhi_driver mhi_uci_driver = {
 	.id_table = mhi_uci_match_table,

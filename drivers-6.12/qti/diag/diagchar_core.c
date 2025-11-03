@@ -52,6 +52,7 @@
 #ifdef CONFIG_COMPAT
 #include <linux/compat.h>
 #endif
+#include <linux/string.h>
 
 MODULE_DESCRIPTION("Diag Char Driver");
 MODULE_LICENSE("GPL v2");
@@ -288,7 +289,7 @@ void diag_add_client(int i, struct file *file)
 	if (diagpriv_data)
 		diagpriv_data->pid = current->tgid;
 	file->private_data = diagpriv_data;
-	strlcpy(driver->client_map[i].name, current->comm, 20);
+	strscpy(driver->client_map[i].name, current->comm, 20);
 	driver->client_map[i].name[19] = '\0';
 }
 
@@ -2713,7 +2714,7 @@ static int diag_ioctl_cmd_reg_compat(unsigned long ioarg)
 		return -EFAULT;
 	}
 
-	strlcpy(reg_tbl.sync_obj_name, reg_tbl_compat.sync_obj_name,
+	strscpy(reg_tbl.sync_obj_name, reg_tbl_compat.sync_obj_name,
 		MAX_SYNC_OBJ_NAME_SIZE);
 	reg_tbl.count = reg_tbl_compat.count;
 	reg_tbl.entries = (struct diag_cmd_reg_entry_t *)
@@ -4460,7 +4461,7 @@ static int __init diagchar_init(void)
 	pr_debug("diagchar initializing ..\n");
 	driver->num = 1;
 	driver->name = ((void *)driver) + sizeof(struct diagchar_dev);
-	strlcpy(driver->name, "diag", 5);
+	strscpy(driver->name, "diag", 5);
 	/* Get major number from kernel and initialize */
 	ret = alloc_chrdev_region(&dev, driver->minor_start,
 				    driver->num, driver->name);

@@ -20,7 +20,7 @@
 #include <linux/uaccess.h>
 #include <linux/ratelimit.h>
 #include <linux/usb/cdc.h>
-#include <asm/unaligned.h>
+#include "linux/unaligned.h"
 #include <linux/usb/mdm_data_bridge.h>
 
 #define DEFAULT_READ_URB_LENGTH	4096

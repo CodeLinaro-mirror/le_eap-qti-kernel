@@ -136,7 +136,7 @@ static int rmnet_ioctl_extended(struct net_device *dev, struct ifreq *ifr)
 		ext_cmd.u.data = 0;
 		break;
 	case RMNET_IOCTL_GET_DRIVER_NAME:
-		strlcpy(ext_cmd.u.if_name, unet->driver_name,
+		strscpy(ext_cmd.u.if_name, unet->driver_name,
 			sizeof(ext_cmd.u.if_name));
 		break;
 	case RMNET_IOCTL_SET_SLEEP_STATE:

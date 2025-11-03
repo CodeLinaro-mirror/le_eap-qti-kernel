@@ -34,6 +34,8 @@
 #include "diagfwd_peripheral.h"
 #include "diagfwd_socket.h"
 #include "diag_ipc_logging.h"
+#include <linux/string.h>
+#include <linux/net.h>
 
 #define DIAG_SVC_ID		0x1001
 
@@ -856,7 +858,7 @@ static void __diag_socket_init(struct diag_socket_info *info)
 	info->data_ready = 0;
 	atomic_set(&info->flow_cnt, 0);
 	spin_lock_init(&info->lock);
-	strlcpy(wq_name, info->name, sizeof(wq_name));
+	strscpy(wq_name, info->name, sizeof(wq_name));
 	init_waitqueue_head(&info->read_wait_q);
 	info->wq = create_singlethread_workqueue(wq_name);
 	if (!info->wq) {
