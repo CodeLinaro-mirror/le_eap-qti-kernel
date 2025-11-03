@@ -6,10 +6,10 @@
 / {
         qcom,sdx_ext_ipc {
                 compatible = "qcom,sdx-ext-ipc";
-                qcom,wakeup-in-gpio = <&i2c5_gpio_expander_21 4 GPIO_ACTIVE_HIGH>;
+                qcom,wakeup-in-gpio = <&i2c6_gpio_expander_21 14 GPIO_ACTIVE_HIGH>;
                 qcom,wakeup-out-gpio = <&i2c5_gpio_expander_21 5 GPIO_ACTIVE_LOW>;
                 qcom,errfatal-out-gpio = <&i2c5_gpio_expander_21 6 GPIO_ACTIVE_HIGH>;
-                qcom,errfatal-in-gpio = <&i2c5_gpio_expander_21 7 GPIO_ACTIVE_HIGH>;
+                qcom,errfatal-in-gpio = <&i2c6_gpio_expander_21 15 GPIO_ACTIVE_HIGH>;
                 pinctrl-names = "default";
                 qcom,default-policy-nop;
                 status = "ok";
