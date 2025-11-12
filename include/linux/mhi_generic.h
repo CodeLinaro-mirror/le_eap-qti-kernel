@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
  *
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #ifndef _MHI_H_
 #define _MHI_H_
@@ -16,6 +16,9 @@
 #include <linux/wait.h>
 #include <linux/workqueue.h>
 #include <linux/init.h>
+
+/* MHI client drivers to set this upper bound for tx buffer */
+#define MHI_MAX_MTU 0xffff
 
 #define MHI_MAX_OEM_PK_HASH_SEGMENTS 16
 
