@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -133,6 +134,7 @@ static int qcom_usb_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
 	struct qrtr_usb_dev *qdev = container_of(ep, struct qrtr_usb_dev, ep);
 	struct urb *out_urb = NULL;
 	struct completion compl;
+	unsigned int maxpacket;
 	int rc;
 
 	rc = skb_linearize(skb);
@@ -152,6 +154,11 @@ static int qcom_usb_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
 	init_completion(&compl);
 	usb_fill_bulk_urb(out_urb, qdev->udev, qdev->out_pipe,
 			  skb->data, skb->len, qcom_usb_qrtr_txn_cb, &compl);
+
+	/* If len is an exact multiple of maxpacket, request a trailing ZLP. */
+	maxpacket = usb_maxpacket(qdev->udev, qdev->out_pipe, usb_pipeout(qdev->out_pipe));
+	if (maxpacket && skb->len % maxpacket == 0)
+		out_urb->transfer_flags |= URB_ZERO_PACKET;
 
 	usb_anchor_urb(out_urb, &qdev->submitted);
 	rc = usb_submit_urb(out_urb, GFP_KERNEL);
