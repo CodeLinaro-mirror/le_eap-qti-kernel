@@ -1974,6 +1974,9 @@ static void mdm_data_unbind(struct usb_configuration *c, struct usb_function *f)
 
 	pr_debug("%s: start unbinding port %pK\n", __func__, port);
 
+	/* Reset string id */
+	mdm_data_string_defs[0].id = 0;
+
 	ctrl_port = mdm_ctrl_ports[port->id];
 	usb_free_all_descriptors(f);
 
@@ -2030,12 +2033,15 @@ static int mdm_data_bind(struct usb_configuration *c, struct usb_function *f)
 
 	data_desc->bInterfaceProtocol = status;
 
-	status = usb_string_id(cdev);
-	if (status < 0)
-		return status;
-	mdm_data_string_defs[id].id = status;
-	data_desc->iInterface = status;
-	mdm_data_string_defs[id].s = "MDM Data";
+	if (mdm_data_string_defs[0].id == 0 ) {
+		status = usb_string_id(cdev);
+		if (status < 0)
+			return status;
+
+		mdm_data_string_defs[0].id = status;
+		data_desc->iInterface = status;
+		mdm_data_string_defs[0].s = "MDM Data";
+	}
 
 	status = -ENODEV;
 	ep = usb_ep_autoconfig(cdev->gadget, &fs_bulk_in_desc);
