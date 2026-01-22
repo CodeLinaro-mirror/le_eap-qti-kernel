@@ -188,7 +188,10 @@ static irqreturn_t ap_status_change(int irq, void *dev_id)
 	if (mdm->gpdesc[STATUS_IN])
 		active_low = gpiod_is_active_low(mdm->gpdesc[STATUS_IN]);
 
-	state = gpiod_get_value(mdm->gpdesc[STATUS_IN]);
+	if (gpiod_cansleep(mdm->gpdesc[STATUS_IN]))
+		state = gpiod_get_value_cansleep(mdm->gpdesc[STATUS_IN]);
+	else
+		state = gpiod_get_value(mdm->gpdesc[STATUS_IN]);
 	if ((!active_low && !state) || (active_low && state)) {
 		if (mdm->policy) {
 			evt = '0';
@@ -237,7 +240,10 @@ static irqreturn_t ap_err_status_change(int irq, void *dev_id)
 	if (mdm->gpdesc[ERRFATAL_IN])
 		active_low = gpiod_is_active_low(mdm->gpdesc[ERRFATAL_IN]);
 
-	state = gpiod_get_value(mdm->gpdesc[ERRFATAL_IN]);
+	if (gpiod_cansleep(mdm->gpdesc[ERRFATAL_IN]))
+		state = gpiod_get_value_cansleep(mdm->gpdesc[ERRFATAL_IN]);
+	else
+		state = gpiod_get_value(mdm->gpdesc[ERRFATAL_IN]);
 	if ((!active_low && !state) || (active_low && state)) {
 		if (mdm->policy) {
 			evt = '0';
@@ -415,7 +421,10 @@ static ssize_t sb_read(struct file *filp,
 
 	if (kfifo_is_empty(&mdm->st_in_fifo)) {
 		spin_unlock(&mdm->st_in_wq.lock);
-		state = gpiod_get_value(mdm->gpdesc[STATUS_IN]);
+		if (gpiod_cansleep(mdm->gpdesc[STATUS_IN]))
+			state = gpiod_get_value_cansleep(mdm->gpdesc[STATUS_IN]);
+		else
+			state = gpiod_get_value(mdm->gpdesc[STATUS_IN]);
 		evt[0] = state ? '1' : '0';
 		if (copy_to_user(buf, evt, 1))
 			return -EFAULT;
@@ -506,7 +515,10 @@ static ssize_t sb_err_read(struct file *filp,
 
 	if (kfifo_is_empty(&mdm->err_in_fifo)) {
 		spin_unlock(&mdm->err_in_wq.lock);
-		state = gpiod_get_value(mdm->gpdesc[ERRFATAL_IN]);
+		if (gpiod_cansleep(mdm->gpdesc[ERRFATAL_IN]))
+			state = gpiod_get_value_cansleep(mdm->gpdesc[ERRFATAL_IN]);
+		else
+			state = gpiod_get_value(mdm->gpdesc[ERRFATAL_IN]);
 		evt[0] = state ? '1' : '0';
 		if (copy_to_user(buf, evt, 1))
 			return -EFAULT;
