@@ -273,6 +273,11 @@ static ssize_t mode_store(struct device *dev,
 			spin_unlock_bh(&drvdata->lock);
 
 	} else if (!strcmp(str, str_mhi_transfer_mode[MHI_TRANSFER_TYPE_USB])) {
+#if !IS_ENABLED(CONFIG_USB_F_QDSS)
+		/* USB transport is not supported in this build */
+		ret = -EOPNOTSUPP;
+		goto out;
+#else
 		if (drvdata->mode == MHI_TRANSFER_TYPE_UCI) {
 			if (drvdata->opened == ENABLE) {
 				drvdata->opened = DISABLE;
@@ -295,7 +300,7 @@ static ssize_t mode_store(struct device *dev,
 			}
 		} else
 			spin_unlock_bh(&drvdata->lock);
-
+#endif
 	} else {
 		ret = -EINVAL;
 		goto out;
@@ -738,7 +743,15 @@ static int mhi_queue_inbound(struct qdss_bridge_drvdata *drvdata)
 	struct mhi_device *mhi_dev = drvdata->mhi_dev;
 	void *buf;
 	struct qdss_mhi_buf_tbl_t *entry;
-	int ret = -EIO, i;
+	int ret = 0, i;
+
+	if (!drvdata->nr_trbs) {
+		drvdata->nr_trbs = mhi_get_free_desc_count(mhi_dev, DMA_FROM_DEVICE);
+		if (!drvdata->nr_trbs) {
+			pr_err("No free RX descriptors (nr_trbs=0)\n");
+			return -ENOSPC;
+		}
+	}
 
 	for (i = 0; i < drvdata->nr_trbs; i++) {
 		entry = kzalloc(sizeof(*entry), GFP_KERNEL);
@@ -765,7 +778,7 @@ static int mhi_queue_inbound(struct qdss_bridge_drvdata *drvdata)
 		list_add_tail(&entry->link, &drvdata->mhi_buf_tbl);
 	}
 
-	return ret;
+	return 0;
 err:
 	return -ENOMEM;
 
@@ -948,7 +961,11 @@ static int qdss_mhi_probe(struct mhi_device *mhi_dev,
 		goto exit_cdev_add;
 	}
 
+#if IS_ENABLED(CONFIG_USB_F_QDSS)
 	drvdata->mode = MHI_TRANSFER_TYPE_USB;
+#else
+	drvdata->mode = MHI_TRANSFER_TYPE_UCI;
+#endif
 	drvdata->mtu = min_t(size_t, id->driver_data, MHI_MAX_MTU);
 	drvdata->mhi_dev = mhi_dev;
 	bridge_drvdata = drvdata;
@@ -959,7 +976,9 @@ static int qdss_mhi_probe(struct mhi_device *mhi_dev,
 		pr_err("Device probe failed err:%d\n", ret);
 		goto exit_destroy_device;
 	}
+#if IS_ENABLED(CONFIG_USB_F_QDSS)
 	queue_work(drvdata->mhi_wq, &drvdata->open_work);
+#endif
 	return 0;
 
 exit_destroy_device:
