@@ -101,6 +101,18 @@ do_unpack_extra () {
 	else
 		echo "fail"
 	fi
+	if git apply --check "${UNPACKDIR}/eap-qti-kernel/patches-6.12/0005-PCI-imx6-Assert-PERST-during-PCIe-host-exit-sequence.patch"; then
+		echo "success"
+		git apply ${UNPACKDIR}/eap-qti-kernel/patches-6.12/0005-PCI-imx6-Assert-PERST-during-PCIe-host-exit-sequence.patch
+	else
+		echo "fail"
+	fi
+	if git apply --check "${UNPACKDIR}/eap-qti-kernel/patches-6.12/0006-LF-16863-PCI-imx6-Add-runtime-PM-support-for-i.MX95.patch"; then
+		echo "success"
+		git apply ${UNPACKDIR}/eap-qti-kernel/patches-6.12/0006-LF-16863-PCI-imx6-Add-runtime-PM-support-for-i.MX95.patch
+	else
+		echo "fail"
+	fi
         cd -
     else
         bbfatal "Kernel version ${LINUX_VERSION} is not supported"
