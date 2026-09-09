@@ -29,6 +29,7 @@ struct qrtr_mhi_dev {
 	struct list_head ul_pkts;
 	struct completion prepared;
 	struct completion ringfull;
+	bool abort_tx;
 };
 
 struct qrtr_mhi_pkt {
@@ -94,7 +95,8 @@ static int qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
 		if (skb->sk)
 			sock_put(skb->sk);
 		kfree_skb(skb);
-                return rc;
+		dev_err(qdev->dev, "send aborted as probe in progress\n");
+		return rc;
 	}
 
 	rc = skb_linearize(skb);
@@ -114,6 +116,20 @@ static int qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
 	kref_get(&pkt->refcount);
 	pkt->skb = skb;
 	do {
+		if (READ_ONCE(qdev->abort_tx)) {
+			kfree_skb(skb);
+			kfree(pkt);
+			spin_lock_bh(&qdev->ul_lock);
+			while (!list_empty(&qdev->ul_pkts)) {
+				pkt = list_first_entry(&qdev->ul_pkts, struct qrtr_mhi_pkt,
+						       node);
+				list_del(&pkt->node);
+				complete_all(&pkt->done);
+				kref_put(&pkt->refcount, qrtr_mhi_pkt_release);
+			}
+			spin_unlock_bh(&qdev->ul_lock);
+			return -EIO;
+		}
 		spin_lock_bh(&qdev->ul_lock);
 		list_add_tail(&pkt->node, &qdev->ul_pkts);
 		rc = mhi_queue_skb(qdev->mhi_dev, DMA_TO_DEVICE, skb, skb->len,
@@ -127,6 +143,18 @@ static int qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
 		}
 		spin_unlock_bh(&qdev->ul_lock);
 		if (rc == -EAGAIN) {
+			if (READ_ONCE(qdev->abort_tx)) {
+				spin_lock_bh(&qdev->ul_lock);
+				while (!list_empty(&qdev->ul_pkts)) {
+					pkt = list_first_entry(&qdev->ul_pkts, struct qrtr_mhi_pkt,
+							       node);
+					list_del(&pkt->node);
+					complete_all(&pkt->done);
+					kref_put(&pkt->refcount, qrtr_mhi_pkt_release);
+				}
+				spin_unlock_bh(&qdev->ul_lock);
+				return -EIO;
+			}
 			reinit_completion(&qdev->ringfull);
 			wait_for_completion(&qdev->ringfull);
 			spin_lock_bh(&qdev->ul_lock);
@@ -194,6 +222,9 @@ static void qcom_mhi_qrtr_remove(struct mhi_device *mhi_dev)
 {
 	struct qrtr_mhi_dev *qdev = dev_get_drvdata(&mhi_dev->dev);
 
+	WRITE_ONCE(qdev->abort_tx, true);
+	complete_all(&qdev->prepared);
+	complete_all(&qdev->ringfull);
 	qrtr_endpoint_unregister(&qdev->ep);
 	dev_set_drvdata(&mhi_dev->dev, NULL);
 }
