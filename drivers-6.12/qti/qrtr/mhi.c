@@ -83,6 +83,19 @@ static void qcom_mhi_qrtr_ul_callback(struct mhi_device *mhi_dev,
 	complete_all(&qdev->ringfull);
 }
 
+static void qcom_mhi_qrtr_status_cb(struct mhi_device *mhi_dev,
+				    enum mhi_callback reason)
+{
+	struct qrtr_mhi_dev *qdev = dev_get_drvdata(&mhi_dev->dev);
+
+	if (!qdev || reason != MHI_CB_FATAL_ERROR)
+		return;
+
+	WRITE_ONCE(qdev->abort_tx, true);
+	complete_all(&qdev->prepared);
+	complete_all(&qdev->ringfull);
+}
+
 /* from qrtr to mhi */
 static int qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
 {
@@ -239,6 +252,7 @@ static struct mhi_driver qcom_mhi_qrtr_driver = {
 	.remove = qcom_mhi_qrtr_remove,
 	.dl_xfer_cb = qcom_mhi_qrtr_dl_callback,
 	.ul_xfer_cb = qcom_mhi_qrtr_ul_callback,
+	.status_cb = qcom_mhi_qrtr_status_cb,
 	.id_table = qcom_mhi_qrtr_mhi_match,
 	.driver = {
 		.name = "qcom_mhi_qrtr",
