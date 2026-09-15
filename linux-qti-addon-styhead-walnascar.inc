@@ -113,6 +113,12 @@ do_unpack_extra () {
 	else
 		echo "fail"
 	fi
+	if git apply --check "${UNPACKDIR}/eap-qti-kernel/patches-6.12/0007-PCI-msi-Add-workaround-to-restore-MSI-data-during-pc.patch"; then
+		echo "success"
+		git apply ${UNPACKDIR}/eap-qti-kernel/patches-6.12/0007-PCI-msi-Add-workaround-to-restore-MSI-data-during-pc.patch
+	else
+		echo "fail"
+	fi
         cd -
     else
         bbfatal "Kernel version ${LINUX_VERSION} is not supported"
