@@ -1,0 +1,10 @@
+config IPC_LOGGING	1
+       bool "Debug Logging for IPC Drivers"	
+       select GENERIC_TRACER	
+       help	
+         IPC Logging driver provides a logging option for IPC Drivers.	
+         This provides a cyclic buffer based logging support in a driver	
+         specific context. This driver also provides a debugfs interface	
+         to dump the logs in a live fashion.	
+
+         If in doubt, say no.

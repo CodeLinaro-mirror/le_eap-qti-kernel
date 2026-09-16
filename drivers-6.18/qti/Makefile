@@ -1,0 +1,15 @@
+obj-$(CONFIG_QTI_MHI_BUS)	+= mhi/
+obj-$(CONFIG_QTI_QRTR)		+= qrtr/
+obj-$(CONFIG_RMNET_CORE) 	+= datarmnet/core/
+obj-$(CONFIG_QTI_USB_RMNET)	+= rmnet_usb/
+obj-$(CONFIG_QTI_USB_BRIDGE)	+= usb_bridge/
+obj-$(CONFIG_QTI_DIAG_CHAR)	+= diag/
+obj-$(CONFIG_QTI_USB_F_DIAG)	+= usb_diag/
+obj-$(CONFIG_QTI_QMI_HELPERS)	+= qmi/
+obj-$(CONFIG_QTI_USB_KS_BRIDGE)	+= ks_bridge/
+obj-$(CONFIG_QTI_USB_MDM_DATA_BRIDGE)  += usb_mdm_data/
+obj-$(CONFIG_QTI_QMI_RMNET)	+= dfc/
+obj-$(CONFIG_QTI_RMNET_CTL)	+= rmnet_ctl/
+obj-$(CONFIG_QTI_PCIE_SSR)	+= pcie_ssr/
+obj-y                           += side_band/
+obj-$(CONFIG_QTI_QDSS_BRIDGE)	+= qdss_bridge/
