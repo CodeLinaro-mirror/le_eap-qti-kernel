@@ -8,6 +8,8 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: GPL-2.0-only
  */
 
 #include <linux/kernel.h>
@@ -410,7 +412,7 @@ static void defer_kevent(struct work_struct *work)
 		container_of(work, struct data_bridge, kevent);
 
 	if (test_bit(TX_HALT, &dev->flags)) {
-		usb_unlink_anchored_urbs(&dev->tx_active);
+		usb_kill_anchored_urbs(&dev->tx_active);
 
 		status = usb_autopm_get_interface(dev->intf);
 		if (status < 0) {
@@ -429,7 +431,7 @@ static void defer_kevent(struct work_struct *work)
 	}
 
 	if (test_bit(RX_HALT, &dev->flags)) {
-		usb_unlink_anchored_urbs(&dev->rx_active);
+		usb_kill_anchored_urbs(&dev->rx_active);
 
 		status = usb_autopm_get_interface(dev->intf);
 		if (status < 0) {

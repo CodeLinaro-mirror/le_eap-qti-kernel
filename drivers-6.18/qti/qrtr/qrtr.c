@@ -31,6 +31,7 @@
 #include <linux/version.h>
 
 #include <net/sock.h>
+#include <net/rtnetlink.h>
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0))
 #include <linux/sched.h>
 #else
@@ -2083,6 +2084,11 @@ static const struct net_proto_family qrtr_family = {
 	.create	= qrtr_create,
 };
 
+static const struct rtnl_msg_handler qrtr_rtnl_msg_handlers[] = {
+	{ .owner = THIS_MODULE, .protocol = PF_QIPCRTR, .msgtype = RTM_NEWADDR,
+	  .doit = qrtr_addr_doit },
+};
+
 static int __init qrtr_proto_init(void)
 {
 	int rc;
@@ -2097,7 +2103,7 @@ static int __init qrtr_proto_init(void)
 		return rc;
 	}
 
-	rtnl_register(PF_QIPCRTR, RTM_NEWADDR, qrtr_addr_doit, NULL, 0);
+	rtnl_register_many(qrtr_rtnl_msg_handlers);
 
 	return 0;
 }
@@ -2105,7 +2111,7 @@ postcore_initcall(qrtr_proto_init);
 
 static void __exit qrtr_proto_fini(void)
 {
-	rtnl_unregister(PF_QIPCRTR, RTM_NEWADDR);
+	rtnl_unregister_many(qrtr_rtnl_msg_handlers);
 	sock_unregister(qrtr_family.family);
 	proto_unregister(&qrtr_proto);
 }
