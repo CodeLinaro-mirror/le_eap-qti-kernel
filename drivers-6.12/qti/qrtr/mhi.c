@@ -93,7 +93,7 @@ static void qcom_mhi_qrtr_ul_callback(struct mhi_device *mhi_dev,
 	struct qrtr_mhi_pkt *pkt;
 
 	spin_lock_bh(&qdev->ul_lock);
-	if (!list_empty(&mhi_xprtp->ul_pkts)) {
+	if (!list_empty(&qdev->ul_pkts)) {
 		pkt = list_first_entry(&qdev->ul_pkts, struct qrtr_mhi_pkt, node);
 		list_del(&pkt->node);
 		complete_all(&pkt->done);
