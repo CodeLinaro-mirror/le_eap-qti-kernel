@@ -36,9 +36,12 @@ SRC_URI += "file://eap-qti-kernel"
 LINUX_VERSION ??= "${PV}"
 
 do_unpack_extra () {
-    if [ "${@d.getVar('LINUX_VERSION')[0:4]}" == "6.12" ]; then
+    if [ "${@d.getVar('LINUX_VERSION')[0:4]}" = "6.12" ]; then
             rm -rf ${UNPACKDIR}/eap-qti-kernel/drivers
 	    cp -r ${UNPACKDIR}/eap-qti-kernel/drivers-6.12 ${UNPACKDIR}/eap-qti-kernel/drivers
+    elif [ "${@d.getVar('LINUX_VERSION')[0:4]}" = "6.18" ]; then
+            rm -rf ${UNPACKDIR}/eap-qti-kernel/drivers
+	    cp -r ${UNPACKDIR}/eap-qti-kernel/drivers-6.18 ${UNPACKDIR}/eap-qti-kernel/drivers
     fi
 
     cp -r ${UNPACKDIR}/eap-qti-kernel/* ${S}/
@@ -68,8 +71,15 @@ do_unpack_extra () {
 
     if [ -e ${S}/arch/arm64/boot/dts/freescale/imx95.dtsi ]; then
         echo "#include \"eap_diag.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/imx95.dtsi
-        echo "#include \"eap-sdx-ext-ipc-imx95-19x19.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/imx95.dtsi
+        if [ "${@d.getVar('LINUX_VERSION')[0:4]}" = "6.12" ]; then
+		echo "#include \"eap-sdx-ext-ipc-imx95-19x19.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/imx95.dtsi
+        elif [ "${@d.getVar('LINUX_VERSION')[0:4]}" = "6.18" ]; then
+		echo "#include \"eap-sdx-ext-ipc-imx95-19x19_ker_618.dtsi\"" >> ${S}/arch/arm64/boot/dts/freescale/imx95.dtsi
+        else
+		echo " imx95 dtsi p-sdx-ext-ipc patch not applied"
+        fi
     fi
+
 
     if [ "${@d.getVar('LINUX_VERSION')[0:4]}" = "6.12" ]; then
         cd ${S}
@@ -120,19 +130,102 @@ do_unpack_extra () {
 		echo "fail"
 	fi
         cd -
+    elif [ "${@d.getVar('LINUX_VERSION')[0:4]}" = "6.18" ]; then
+        cd ${S}
+        sed -e '/CONFIG_QTI_RMNET/d' ${UNPACKDIR}/eap-qti-kernel/defconfig -i ${UNPACKDIR}/eap-qti-kernel/defconfig
+        sed -e '/CONFIG_QTI_QMI_RMNET/d' ${UNPACKDIR}/eap-qti-kernel/defconfig -i ${UNPACKDIR}/eap-qti-kernel/defconfig
+        sed -e '/CONFIG_QTI_RMNET_CTL/d' ${UNPACKDIR}/eap-qti-kernel/defconfig -i ${UNPACKDIR}/eap-qti-kernel/defconfig
+        sed -e '/CONFIG_QTI_QMI_DFC/d' ${UNPACKDIR}/eap-qti-kernel/defconfig -i ${UNPACKDIR}/eap-qti-kernel/defconfig
+	if git apply --check "${UNPACKDIR}/eap-qti-kernel/patches-6.18/0001-Add-support-for-kernel-API-used-in-diag-and-mhi-k6.18-refresh.patch"; then
+		echo "success"
+		git apply ${UNPACKDIR}/eap-qti-kernel/patches-6.18/0001-Add-support-for-kernel-API-used-in-diag-and-mhi-k6.18-refresh.patch
+	else
+		echo "fail"
+	fi
+	if git apply --check "${UNPACKDIR}/eap-qti-kernel/patches-6.18/0002-net-cdc_ether-Ensure-that-default-MTU-is-minimum-204.patch"; then
+		echo "success"
+		git apply ${UNPACKDIR}/eap-qti-kernel/patches-6.18/0002-net-cdc_ether-Ensure-that-default-MTU-is-minimum-204.patch
+	else
+		echo "fail"
+	fi
+	if git apply --check "${UNPACKDIR}/eap-qti-kernel/patches-6.18/0003-net-usbnet-Update-net_device-stats-for-RmNet-device-.patch"; then
+		echo "success"
+		git apply ${UNPACKDIR}/eap-qti-kernel/patches-6.18/0003-net-usbnet-Update-net_device-stats-for-RmNet-device-.patch
+	else
+		echo "fail"
+	fi
+	if git apply --check "${UNPACKDIR}/eap-qti-kernel/patches-6.18/0004-Add-support-for-upstream-rmnet-driver.patch"; then
+		echo "success"
+		git apply ${UNPACKDIR}/eap-qti-kernel/patches-6.18/0004-Add-support-for-upstream-rmnet-driver.patch
+	else
+		echo "fail"
+	fi
+	if git apply --check "${UNPACKDIR}/eap-qti-kernel/patches-6.18/0005-PCI-imx6-Assert-PERST-during-PCIe-host-exit-sequence.patch"; then
+		echo "success"
+		git apply ${UNPACKDIR}/eap-qti-kernel/patches-6.18/0005-PCI-imx6-Assert-PERST-during-PCIe-host-exit-sequence.patch
+	else
+		echo "fail"
+	fi
+	if git apply --check "${UNPACKDIR}/eap-qti-kernel/patches-6.18/0006-PCI-msi-Add-workaround-to-restore-MSI-data-during-pc.patch"; then
+		echo "success"
+		git apply ${UNPACKDIR}/eap-qti-kernel/patches-6.18/0006-PCI-msi-Add-workaround-to-restore-MSI-data-during-pc.patch
+	else
+		echo "fail"
+	fi
+	cd -
     else
         bbfatal "Kernel version ${LINUX_VERSION} is not supported"
     fi
 }
 
 addtask unpack_extra after do_kernel_metadata before do_patch
-addtask do_preconfigure after do_merge_delta_config before do_configure
-addtask do_copy after do_configure before do_compile
-do_preconfigure () {
-    cat ${UNPACKDIR}/eap-qti-kernel/defconfig >> ${WORKDIR}/defconfig
+
+qti_add_fragment_once() {
+    target_defconfig="$1"
+
+    [ -f "${target_defconfig}" ] || return 0
+
+    # Avoid duplicating the same fragment on repeated -f task runs.
+    if grep -q '^# QTI_EAP_DEFCONFIG_BEGIN$' "${target_defconfig}"; then
+        bbnote "QTI defconfig fragment already present in ${target_defconfig}"
+        return 0
+    fi
+
+    {
+        echo "# QTI_EAP_DEFCONFIG_BEGIN"
+        cat "${qti_defconfig}"
+        echo "# QTI_EAP_DEFCONFIG_END"
+    } >> "${target_defconfig}"
 }
 
-do_copy() {
-        cp ${WORKDIR}/defconfig ${WORKDIR}/build/.config
+qti_apply_defconfig_fragment() {
+    # kernel-yocto configme consumes ${WORKDIR}/sources/defconfig.
+    # Fall back to ${WORKDIR}/defconfig for compatibility.
+    base_defconfig="${WORKDIR}/sources/defconfig"
+    [ -f "${base_defconfig}" ] || base_defconfig="${WORKDIR}/defconfig"
+
+    if [ -f "${UNPACKDIR}/eap-qti-kernel/defconfig" ]; then
+        qti_defconfig="${UNPACKDIR}/eap-qti-kernel/defconfig"
+    elif [ -f "${WORKSPACE}/sources/eap-qti-kernel/defconfig" ]; then
+        qti_defconfig="${WORKSPACE}/sources/eap-qti-kernel/defconfig"
+    else
+        bbfatal "Missing defconfig: checked ${UNPACKDIR}/eap-qti-kernel/defconfig and ${WORKSPACE}/sources/eap-qti-kernel/defconfig"
+    fi
+
+    # Keep WORKDIR copy updated for traceability/debug.
+    qti_add_fragment_once "${base_defconfig}"
+
+    # This is the effective base used by merge_config.sh during do_kernel_configme.
+    qti_add_fragment_once "${S}/.kernel-meta/configs/defconfig"
 }
+
+# kernel-yocto calls do_kernel_metadata from inside do_kernel_configme and
+# refreshes defconfig from KBUILD_DEFCONFIG there. Inject after metadata so
+# entries survive into the merge_config input.
+do_kernel_metadata:append() {
+    if [ "$1" = "config" ]; then
+        qti_apply_defconfig_fragment
+    fi
+}
+
 
