@@ -318,8 +318,8 @@ static struct mhi_event_config modem_qcom_sa525m_mhi_events[] = {
 	MHI_EVENT_CONFIG_SW_DATA(5, 128),
 
 	/* Hardware channels request dedicated hardware event rings */
-	MHI_EVENT_CONFIG_HW_DATA(6, 512, 100),
-	MHI_EVENT_CONFIG_HW_DATA(7, 512, 101),
+	MHI_EVENT_CONFIG_HW_DATA(6, 1024, 100),
+	MHI_EVENT_CONFIG_HW_DATA(7, 1024, 101),
 
 	MHI_EVENT_CONFIG_HW_DATA(8, 512, 103)
 };
