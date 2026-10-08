@@ -1,0 +1,8 @@
+config QTI_QDSS_BRIDGE
+        tristate "Configure bridge driver for QTI/Qualcomm Technologies, Inc. MDM"
+        depends on QTI_MHI_BUS
+        help
+          The driver will help route diag traffic from modem side over the QDSS
+          sub-system to USB on APSS side. The driver acts as a bridge between the
+          MHI and USB interface.
+          If unsure, say N.

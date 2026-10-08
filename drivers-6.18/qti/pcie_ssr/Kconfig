@@ -1,0 +1,10 @@
+menu "PCIE_SSR"
+
+config QTI_PCIE_SSR
+       tristate "PCIE SSR"
+       depends on QTI_MHI_BUS_ARCH
+       help
+         If you say yes to this option, MHI bus arch support for Qualcomm Technologies, Inc modem chipsets
+         will be enabled.
+
+endmenu
