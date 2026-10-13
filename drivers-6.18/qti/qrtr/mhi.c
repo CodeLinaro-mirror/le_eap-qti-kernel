@@ -28,6 +28,7 @@ struct qrtr_mhi_dev {
 	spinlock_t ul_lock;		/* lock to protect ul_pkts */
 	struct list_head ul_pkts;
 	struct completion prepared;
+	struct completion ringfull;
 };
 
 struct qrtr_mhi_pkt {
@@ -78,6 +79,7 @@ static void qcom_mhi_qrtr_ul_callback(struct mhi_device *mhi_dev,
 
 	kref_put(&pkt->refcount, qrtr_mhi_pkt_release);
 	spin_unlock_bh(&qdev->ul_lock);
+	complete_all(&qdev->ringfull);
 }
 
 /* from qrtr to mhi */
@@ -92,6 +94,7 @@ static int qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
 		if (skb->sk)
 			sock_put(skb->sk);
 		kfree_skb(skb);
+                return rc;
 	}
 
 	rc = skb_linearize(skb);
@@ -110,18 +113,27 @@ static int qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
 	kref_init(&pkt->refcount);
 	kref_get(&pkt->refcount);
 	pkt->skb = skb;
-	spin_lock_bh(&qdev->ul_lock);
-	list_add_tail(&pkt->node, &qdev->ul_pkts);
-	rc = mhi_queue_skb(qdev->mhi_dev, DMA_TO_DEVICE, skb, skb->len,
-						MHI_EOT);
-	if (rc) {
-		list_del(&pkt->node);
-		kfree_skb(skb);
-		kfree(pkt);
+	do {
+		spin_lock_bh(&qdev->ul_lock);
+		list_add_tail(&pkt->node, &qdev->ul_pkts);
+		rc = mhi_queue_skb(qdev->mhi_dev, DMA_TO_DEVICE, skb, skb->len,
+							MHI_EOT);
+		if (rc && rc != -EAGAIN) {
+			list_del(&pkt->node);
+			kfree_skb(skb);
+			kfree(pkt);
+			spin_unlock_bh(&qdev->ul_lock);
+			return rc;
+		}
 		spin_unlock_bh(&qdev->ul_lock);
-		return rc;
-	}
-	spin_unlock_bh(&qdev->ul_lock);
+		if (rc == -EAGAIN) {
+			reinit_completion(&qdev->ringfull);
+			wait_for_completion(&qdev->ringfull);
+			spin_lock_bh(&qdev->ul_lock);
+                        list_del(&pkt->node);
+			spin_unlock_bh(&qdev->ul_lock);
+		}
+	}  while (rc == -EAGAIN);
 	if (skb->sk)
 		sock_hold(skb->sk);
 
@@ -150,6 +162,7 @@ static int qcom_mhi_qrtr_probe(struct mhi_device *mhi_dev,
 	qdev->dev = &mhi_dev->dev;
 	qdev->ep.xmit = qcom_mhi_qrtr_send;
 	init_completion(&qdev->prepared);
+	init_completion(&qdev->ringfull);
 
 	rc = of_property_read_u32(mhi_dev->dev.of_node, "qcom,net-id", &net_id);
 	if (rc < 0)
