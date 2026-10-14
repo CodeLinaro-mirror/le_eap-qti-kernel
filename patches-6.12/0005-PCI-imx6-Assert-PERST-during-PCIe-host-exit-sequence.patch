@@ -1,0 +1,52 @@
+From 3e4dcb7b5189ea059faafdced71d38e83d3e71b3 Mon Sep 17 00:00:00 2001
+From: Venkatesh Perumal <venper@qti.qualcomm.com>
+Date: Wed, 26 Aug 2026 13:57:06 +0530
+Subject: [PATCH] PCI: imx6: Assert PERST# during PCIe host exit sequence
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Assert the PERST# signal in the i.MX PCIe Root Complex driver during
+the host exit flow to ensure proper endpoint reset handling.
+ 
+PERST# is asserted from the imx_pcie_host_exit() callback after a
+10 ms delay following the transmission of PME_TURN_OFF. This delay
+follows the PCI Express Base Specification r6.0, section 5.3.3.2.1,
+which recommends waiting before asserting PERST# to allow endpoints
+to complete the power-down transition.
+
+Signed-off-by: Venkatesh Perumal <venper@qti.qualcomm.com>
+---
+ drivers/pci/controller/dwc/pci-imx6.c             | 2 ++
+ drivers/pci/controller/dwc/pcie-designware-host.c | 2 ++
+ 2 files changed, 4 insertions(+)
+
+diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+index 8314af752bba..5a997b1b9353 100644
+--- a/drivers/pci/controller/dwc/pci-imx6.c
++++ b/drivers/pci/controller/dwc/pci-imx6.c
+@@ -1237,6 +1237,8 @@ static void imx_pcie_host_exit(struct dw_pcie_rp *pp)
+ 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+ 	struct imx_pcie *imx_pcie = to_imx_pcie(pci);
+ 
++ 	gpiod_set_value_cansleep(imx_pcie->reset_gpiod, 1);
++
+ 	if (imx_pcie->phy) {
+ 		if (phy_power_off(imx_pcie->phy))
+ 			dev_err(pci->dev, "unable to power off PHY\n");
+diff --git a/drivers/pci/controller/dwc/pcie-designware-host.c b/drivers/pci/controller/dwc/pcie-designware-host.c
+index 8f9e1170a3eb..b1223977511b 100644
+--- a/drivers/pci/controller/dwc/pcie-designware-host.c
++++ b/drivers/pci/controller/dwc/pcie-designware-host.c
+@@ -968,6 +968,8 @@ int dw_pcie_suspend_noirq(struct dw_pcie *pci)
+ 		if (ret)
+ 			return ret;
+ 	}
++	
++	mdelay(10);
+ 
+ 	dw_pcie_stop_link(pci);
+ 	if (pci->pp.ops->deinit)
+-- 
+2.17.1
+

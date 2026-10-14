@@ -1,0 +1,31 @@
+From c18c6336ead059c620262b4835d454f64203f850 Mon Sep 17 00:00:00 2001
+From: venper <venper@qti.qualcomm.com>
+Date: Wed, 29 Oct 2025 12:38:40 +0530
+Subject: [PATCH] net cdc_ether Ensure that default MTU is minimum 204
+
+eap-qti-kernel 6.12 Driver Patch Updates:
+File changes and configuration support have been added to align with kernel 6.12.
+In the CDC Ethernet module, a patch has been added to set the default MTU packet size.
+
+Signed-off-by: venper <venper@qti.qualcomm.com>
+---
+ drivers/net/usb/cdc_ether.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/net/usb/cdc_ether.c b/drivers/net/usb/cdc_ether.c
+index a6469235d904..f8f60eccd4d8 100644
+--- a/drivers/net/usb/cdc_ether.c
++++ b/drivers/net/usb/cdc_ether.c
+@@ -325,6 +325,9 @@ int usbnet_generic_cdc_bind(struct usbnet *dev, struct usb_interface *intf)
+ 	/* override ethtool_ops */
+ 	dev->net->ethtool_ops = &cdc_ether_ethtool_ops;
+ 
++	if(dev->hard_mtu < 2048)
++		dev->hard_mtu = 2048;
++
+ 	return 0;
+ 
+ bad_desc:
+-- 
+2.17.1
+

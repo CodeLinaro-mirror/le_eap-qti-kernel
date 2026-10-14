@@ -1,0 +1,51 @@
+From f719f04bb0f609a62293de83daf330e77751159a Mon Sep 17 00:00:00 2001
+From: MOhammed Ali Shihab K <mohamk@qti.qualcomm.com>
+Date: Wed, 9 Sep 2026 14:38:59 +0530
+Subject: [PATCH] PCI: imx6: Assert PERST# during PCIe host exit sequence
+
+Assert the PERST# signal in the i.MX PCIe Root Complex driver during
+the host exit flow to ensure proper endpoint reset handling.
+
+PERST# is asserted from the imx_pcie_host_exit() callback after a
+10 ms delay following the transmission of PME_TURN_OFF. This delay
+follows PCI Express Base Specification r6.0, section 5.3.3.2.1,
+which recommends waiting before asserting PERST# to allow endpoints
+to complete the power-down transition.
+
+Signed-off-by: mohamk <mohamk@qti.qualcomm.com>
+---
+ drivers/pci/controller/dwc/pci-imx6.c             | 4 +++-
+ drivers/pci/controller/dwc/pcie-designware-host.c | 2 ++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+index 5a7b96a526a8..b729f7c6b481 100644
+--- a/drivers/pci/controller/dwc/pci-imx6.c
++++ b/drivers/pci/controller/dwc/pci-imx6.c
+@@ -1400,7 +1400,9 @@ static void imx_pcie_host_exit(struct dw_pcie_rp *pp)
+ {
+ 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+ 	struct imx_pcie *imx_pcie = to_imx_pcie(pci);
+-
++	
++	gpiod_set_value_cansleep(imx_pcie->reset_gpiod, 1);
++	
+ 	if (imx_pcie->phy) {
+ 		if (phy_power_off(imx_pcie->phy))
+ 			dev_err(pci->dev, "unable to power off PHY\n");
+diff --git a/drivers/pci/controller/dwc/pcie-designware-host.c b/drivers/pci/controller/dwc/pcie-designware-host.c
+index 8f40f54f54d8..01c99a6bd257 100644
+--- a/drivers/pci/controller/dwc/pcie-designware-host.c
++++ b/drivers/pci/controller/dwc/pcie-designware-host.c
+@@ -1218,6 +1218,8 @@ int dw_pcie_suspend_noirq(struct dw_pcie *pci)
+ 		ret = 0;
+ 	}
+ 
++	mdelay(10);
++
+ 	/*
+ 	 * Per PCIe r6.0, sec 5.3.3.2.1, software should wait at least
+ 	 * 100ns after L2/L3 Ready before turning off refclock and
+-- 
+2.34.1
+

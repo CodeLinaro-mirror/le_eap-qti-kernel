@@ -1,0 +1,38 @@
+From 3d8f02918cf3a88f1a01b6cd426a676dfca8a81e Mon Sep 17 00:00:00 2001
+From: Venkatesh Perumal <venper@qti.qualcomm.com>
+Date: Thu, 10 Sep 2026 11:26:54 +0530
+Subject: [PATCH] PCI: msi: Add workaround to restore MSI data during pci msi
+ resume
+
+MSI data associated with the MHI device is overwritten with "0"
+during the MSI restore flow:
+_pci_restore_msi_state->arch_restore_msi_irqs
+This cause the MHIInterfcae to fail after resume due to incorrect
+MSI configuration.
+
+Add a workaround to restore the MSI data during resume and
+ensure the proper MHI interrupt functionality.
+
+Signed-off-by: Venkatesh Perumal <venper@qti.qualcomm.com>
+---
+ drivers/pci/msi/msi.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/pci/msi/msi.c b/drivers/pci/msi/msi.c
+index 8b8848788618..65a5485c39d0 100644
+--- a/drivers/pci/msi/msi.c
++++ b/drivers/pci/msi/msi.c
+@@ -516,6 +516,10 @@ void __pci_restore_msi_state(struct pci_dev *dev)
+ 
+ 	entry = irq_get_msi_desc(dev->irq);
+ 
++	printk("NXP-IMX95-RC: %s: IRQ %d Before updated msg data is %d\n", __func__, entry->irq, entry->msg.data);
++	entry->msg.data = 0x0;
++	printk("NXP-IMX95-RC: %s: IRQ %d After updated msg data is %d\n", __func__, entry->irq, entry->msg.data);
++
+ 	pci_intx_for_msi(dev, 0);
+ 	pci_msi_set_enable(dev, 0);
+ 	if (arch_restore_msi_irqs(dev))
+-- 
+2.17.1
+

@@ -1,0 +1,45 @@
+From 3a1d809b5b7b46b0e8eec1bbd6bc32cf1b261aab Mon Sep 17 00:00:00 2001
+From: Mohammed Ali Shihab K <mohamk@qti.qualcomm.com>
+Date: Wed, 26 Aug 2026 19:09:18 +0530
+Subject: [PATCH] net: add get_current_napi_context for QTI diag/mhi (k6.18
+ refresh)
+
+Signed-off-by: Mohammed Ali Shihab K <mohamk@qti.qualcomm.com>
+---
+ include/linux/netdevice.h | 1 +
+ net/core/dev.c            | 7 +++++++
+ 2 files changed, 8 insertions(+)
+
+diff --git a/include/linux/netdevice.h b/include/linux/netdevice.h
+index 20bd42fa160c..50f3eed46d92 100644
+--- a/include/linux/netdevice.h
++++ b/include/linux/netdevice.h
+@@ -91,6 +91,7 @@ void synchronize_net(void);
+ void netdev_set_default_ethtool_ops(struct net_device *dev,
+ 				    const struct ethtool_ops *ops);
+ void netdev_sw_irq_coalesce_default_on(struct net_device *dev);
++extern struct napi_struct *get_current_napi_context(void);
+ 
+ /* Backlog congestion levels */
+ #define NET_RX_SUCCESS		0	/* keep 'em coming, baby */
+diff --git a/net/core/dev.c b/net/core/dev.c
+index c8e49eef4519..74a4cd77df2c 100644
+--- a/net/core/dev.c
++++ b/net/core/dev.c
+@@ -7598,6 +7598,13 @@ void __netif_napi_del_locked(struct napi_struct *napi)
+ }
+ EXPORT_SYMBOL(__netif_napi_del_locked);
+ 
++struct napi_struct *get_current_napi_context(void)
++{
++	struct softnet_data *sd = this_cpu_ptr(&softnet_data);
++	return &(sd->backlog);
++}
++EXPORT_SYMBOL(get_current_napi_context);
++
+ static int __napi_poll(struct napi_struct *n, bool *repoll)
+ {
+ 	int work, weight;
+-- 
+2.34.1
+
