@@ -172,6 +172,12 @@ do_unpack_extra () {
 	else
 		echo "fail"
 	fi
+	if git apply --check "${UNPACKDIR}/eap-qti-kernel/patches-6.18/0007-i2c-imx-lpi2c-revert-clock-prepare-unprepare.patch"; then
+                echo "success"
+                git apply ${UNPACKDIR}/eap-qti-kernel/patches-6.18/0007-i2c-imx-lpi2c-revert-clock-prepare-unprepare.patch
+        else
+                echo "fail"
+        fi
 	cd -
     else
         bbfatal "Kernel version ${LINUX_VERSION} is not supported"
