@@ -1734,19 +1734,14 @@ static int qrtr_recvmsg(struct socket *sock, struct msghdr *msg,
 	int copied, rc;
 	u32 type;
 
-	lock_sock(sk);
-
-	if (sock_flag(sk, SOCK_ZAPPED)) {
-		release_sock(sk);
+	if (sock_flag(sk, SOCK_ZAPPED))
 		return -EADDRNOTAVAIL;
-	}
 
-	skb = skb_recv_datagram(sk, flags & ~MSG_DONTWAIT,
-				&rc);
-	if (!skb) {
-		release_sock(sk);
+	skb = skb_recv_datagram(sk, flags, &rc);
+	if (!skb)
 		return rc;
-	}
+
+	lock_sock(sk);
 	cb = (struct qrtr_cb *)skb->cb;
 
 	copied = skb->len;

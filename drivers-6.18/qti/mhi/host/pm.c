@@ -600,6 +600,8 @@ static void mhi_pm_sys_error_transition(struct mhi_controller *mhi_cntrl)
 	struct mhi_cmd_ctxt *cmd_ctxt;
 	struct mhi_cmd *mhi_cmd;
 	struct mhi_event_ctxt *er_ctxt;
+	struct mhi_chan *mhi_chan;
+	struct mhi_device *mhi_dev, *last_mhi_dev = NULL;
 	struct device *dev = &mhi_cntrl->mhi_dev->dev;
 	int ret, i;
 
@@ -609,6 +611,14 @@ static void mhi_pm_sys_error_transition(struct mhi_controller *mhi_cntrl)
 
 	/* We must notify MHI control driver so it can clean up first */
 	mhi_cntrl->status_cb(mhi_cntrl, MHI_CB_SYS_ERROR);
+	for (i = 0, mhi_chan = mhi_cntrl->mhi_chan; i < mhi_cntrl->max_chan; i++, mhi_chan++) {
+		mhi_dev = mhi_chan->mhi_dev;
+		if (!mhi_dev || mhi_dev == last_mhi_dev)
+			continue;
+
+		last_mhi_dev = mhi_dev;
+		mhi_notify(mhi_dev, MHI_CB_SYS_ERROR);
+	}
 
 	mutex_lock(&mhi_cntrl->pm_mutex);
 	write_lock_irq(&mhi_cntrl->pm_lock);

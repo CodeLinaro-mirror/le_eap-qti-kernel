@@ -1,0 +1,76 @@
+From e991c24d9c1e625474087f250fe8c0f6a6d096f2 Mon Sep 17 00:00:00 2001
+From: MOhammed Ali Shihab K <mohamk@qti.qualcomm.com>
+Date: Mon, 19 Oct 2026 11:10:52 +0530
+Subject: [PATCH] Subject: i2c: imx-lpi2c: revert clock prepare/unprepare from
+ runtime PM path
+
+ERR_FATAL_OUT crash notification is driven through a PCAL6408 I2C GPIO
+expander. During kernel panic, the sideband panic notifier attempts to
+assert ERR_FATAL_OUT by performing an I2C transaction.
+
+After commit MLK-16713 ("i2c: imx-lpi2c: add clock prepare/unprepare to
+clock resource management in runtime PM"), the LPI2C runtime resume path
+was changed from:
+
+    clk_bulk_enable()
+
+to:
+
+    clk_bulk_prepare_enable()
+
+On i.MX95, clock preparation triggers SCMI clock operations. During
+panic handling, the I2C transfer enters the runtime PM resume path and
+blocks in:
+
+    lpi2c_runtime_resume()
+      -> clk_bulk_prepare_enable()
+      -> clk_prepare()
+      -> scmi_clk_enable()
+      -> scmi_wait_for_reply()
+
+This results in scheduling activity and RCU warnings while panic
+processing is already in progress, preventing reliable completion of the
+I2C transaction. Consequently, ERR_FATAL_OUT remains asserted and the
+SA525M modem fails to detect the crash indication.
+
+Restore the previous behaviour by using clk_bulk_enable() /
+clk_bulk_disable() instead of clk_bulk_prepare_enable() /
+clk_bulk_disable_unprepare() in the runtime PM path. This avoids the
+SCMI clock prepare sequence during panic-time GPIO expander updates and
+restores correct ERR_FATAL_OUT signalling.
+
+Observed on:
+  - i.MX95 + SA525M fusion platform
+  - ERR_FATAL_OUT connected through PCAL6408 I2C GPIO expander
+  - Kernel 6.18.x regression relative to 6.12.x
+
+Signed-off-by: Mohammed Ali Shihab K <mohamk@qti.qualcomm.com>
+---
+ drivers/i2c/busses/i2c-imx-lpi2c.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-imx-lpi2c.c b/drivers/i2c/busses/i2c-imx-lpi2c.c
+index 3e6ada070799..5c31cec8290f 100644
+--- a/drivers/i2c/busses/i2c-imx-lpi2c.c
++++ b/drivers/i2c/busses/i2c-imx-lpi2c.c
+@@ -1589,7 +1589,7 @@ static int __maybe_unused lpi2c_runtime_suspend(struct device *dev)
+ 	if (lpi2c_imx->hwdata->is_irqsteer_interrupt)
+ 		devm_free_irq(lpi2c_imx->adapter.dev.parent, lpi2c_imx->irq, lpi2c_imx);
+ 
+-	clk_bulk_disable_unprepare(lpi2c_imx->num_clks, lpi2c_imx->clks);
++	clk_bulk_disable(lpi2c_imx->num_clks, lpi2c_imx->clks);
+ 	pinctrl_pm_select_sleep_state(dev);
+ 
+ 	return 0;
+@@ -1601,7 +1601,7 @@ static int __maybe_unused lpi2c_runtime_resume(struct device *dev)
+ 	int ret;
+ 
+ 	pinctrl_pm_select_default_state(dev);
+-	ret = clk_bulk_prepare_enable(lpi2c_imx->num_clks, lpi2c_imx->clks);
++	ret = clk_bulk_enable(lpi2c_imx->num_clks, lpi2c_imx->clks);
+ 	if (ret) {
+ 		dev_err(dev, "failed to enable I2C clock, ret=%d\n", ret);
+ 		return ret;
+-- 
+2.34.1
+
